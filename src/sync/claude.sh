@@ -58,8 +58,8 @@ sync_claude_settings_json_file() {
         return 0
     fi
 
-    # 情况 3: 合法 JSON -> 智能合并（目标 * 源，保留目标所有字段）
-    if jq -s '.[1] * .[0]' "$source_file" "$target_file" > "$tmp_file" 2>/dev/null; then
+    # 情况 3: 合法 JSON -> 顶层字段合并（目标 + 源，源字段整体替换，保留目标独有字段）
+    if jq -s '.[1] + .[0]' "$source_file" "$target_file" > "$tmp_file" 2>/dev/null; then
         if mv -f "$tmp_file" "$target_file"; then
             add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "success"
         else
