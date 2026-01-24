@@ -138,8 +138,17 @@ copy_directory_if_missing() {
         return 0
     fi
 
-    # 遍历所有文件（排除目录）
+    # 遍历所有文件（排除目录和系统文件）
     while IFS= read -r -d '' source_file; do
+        # 跳过常见的系统文件和临时文件
+        local filename
+        filename="$(basename "$source_file")"
+        case "$filename" in
+            .DS_Store|Thumbs.db|desktop.ini|.gitkeep|.*.swp|*~)
+                continue
+                ;;
+        esac
+
         # 计算相对路径: 去掉源目录前缀和开头的斜杠
         relative_path="${source_file#$source_dir}"
         relative_path="${relative_path#/}"
