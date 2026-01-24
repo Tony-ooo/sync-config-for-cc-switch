@@ -1,0 +1,12 @@
+# sync_config.yml - 配置文件同步工具配置
+# 编码: UTF-8
+
+# 源配置目录（支持绝对路径、~ 和环境变量）
+source_dir: /home/dev/workspace/Project/sync_config_test/.cc-switch
+
+# 目标路径列表
+target_dirs:
+  - /home/dev/workspace/Project/sync_config_test/test-path/path1
+  - /home/dev/workspace/Project/sync_config_test/test-path/path2
+  # 可以继续添加更多路径
+  # - /path/to/another/target
