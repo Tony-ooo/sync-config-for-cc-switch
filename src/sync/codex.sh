@@ -76,4 +76,13 @@ copy_codex_files() {
     else
         add_sync_result "config.toml" "合并，保留目标 mcp_servers" "" "error" "未找到源文件"
     fi
+
+    # 复制 skills 目录（仅当目标缺失时复制，保留目标已有文件）
+    if [ -d ".codex/skills" ]; then
+        for target in "${VALID_TARGET_DIRS[@]}"; do
+            copy_directory_if_missing ".codex/skills" "$target/.codex/skills" "$target" "codex-skills"
+        done
+    else
+        add_sync_result "codex-skills" "仅当目标缺失时复制" "" "error" "未找到源目录"
+    fi
 }

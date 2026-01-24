@@ -102,6 +102,15 @@ copy_claude_files() {
     else
         add_sync_result "CLAUDE.md" "仅当目标缺失时复制" "" "error" "未找到源文件"
     fi
+
+    # 复制 skills 目录（仅当目标缺失时复制，保留目标已有文件）
+    if [ -d ".claude/skills" ]; then
+        for target in "${VALID_TARGET_DIRS[@]}"; do
+            copy_directory_if_missing ".claude/skills" "$target/.claude/skills" "$target" "claude-skills"
+        done
+    else
+        add_sync_result "claude-skills" "仅当目标缺失时复制" "" "error" "未找到源目录"
+    fi
 }
 
 # 同步目标侧 .claude.json 到"已完成引导"状态

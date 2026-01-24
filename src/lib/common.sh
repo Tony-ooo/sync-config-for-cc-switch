@@ -109,3 +109,102 @@ is_valid_json() {
         return 1
     fi
 }
+
+# 递归复制目录（仅复制目标侧缺失的文件，汇总输出结果）
+# 参数:
+#   $1 = source_dir (源目录路径，相对于 SOURCE_DIR)
+#   $2 = target_dir (目标目录路径，绝对路径)
+#   $3 = target_root (目标根路径，用于结果记录)
+#   $4 = dir_type (目录类型，如 "skills")
+copy_directory_if_missing() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local target_root="$3"
+    local dir_type="$4"
+    local source_file
+    local relative_path
+    local target_file
+    local target_parent
+    local success_count=0
+    local skip_count=0
+    local warning_count=0
+
+    if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
+        return 0
+    fi
+
+    # 验证源目录存在
+    if [ ! -d "$source_dir" ]; then
+        return 0
+    fi
+
+    # 遍历所有文件（排除目录）
+    while IFS= read -r -d '' source_file; do
+        # 计算相对路径: 去掉源目录前缀和开头的斜杠
+        relative_path="${source_file#$source_dir}"
+        relative_path="${relative_path#/}"
+
+        # 构造目标文件路径
+        target_file="$target_dir/$relative_path"
+
+        # 确保父目录存在
+        target_parent="$(dirname "$target_file")"
+        mkdir -p "$target_parent" 2>/dev/null || true
+
+        # 检查目标文件是否为目录
+        if [ -d "$target_file" ]; then
+            warning_count=$((warning_count + 1))
+            continue
+        fi
+
+        # 检查目标文件是否已存在
+        if [ -e "$target_file" ]; then
+            skip_count=$((skip_count + 1))
+        else
+            # 复制文件
+            if cp -f "$source_file" "$target_file"; then
+                success_count=$((success_count + 1))
+            else
+                warning_count=$((warning_count + 1))
+            fi
+        fi
+    done < <(find "$source_dir" -type f -print0 2>/dev/null)
+
+    # 生成汇总信息
+    local total=$((success_count + skip_count + warning_count))
+    if [ $total -eq 0 ]; then
+        # 没有文件需要复制
+        return 0
+    fi
+
+    local detail=""
+    local status="success"
+
+    if [ $success_count -gt 0 ]; then
+        detail="已复制 ${success_count} 个文件"
+        status="success"
+    fi
+
+    if [ $skip_count -gt 0 ]; then
+        if [ -n "$detail" ]; then
+            detail="${detail}, ${skip_count} 个已存在"
+        else
+            detail="${skip_count} 个文件已存在"
+        fi
+        if [ $success_count -eq 0 ]; then
+            status="skip"
+        fi
+    fi
+
+    if [ $warning_count -gt 0 ]; then
+        if [ -n "$detail" ]; then
+            detail="${detail}, ${warning_count} 个失败"
+        else
+            detail="${warning_count} 个文件复制失败"
+        fi
+        status="warning"
+    fi
+
+    # 记录汇总结果
+    add_sync_result "$dir_type" "仅当目标缺失时复制" "$target_root" "$status" "$detail"
+}

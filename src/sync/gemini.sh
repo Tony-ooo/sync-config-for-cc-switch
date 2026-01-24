@@ -158,4 +158,13 @@ copy_gemini_files() {
     else
         add_sync_result "GEMINI.md" "仅当目标缺失时复制" "" "error" "未找到源文件"
     fi
+
+    # 复制 skills 目录（仅当目标缺失时复制，保留目标已有文件）
+    if [ -d ".gemini/skills" ]; then
+        for target in "${VALID_TARGET_DIRS[@]}"; do
+            copy_directory_if_missing ".gemini/skills" "$target/.gemini/skills" "$target" "gemini-skills"
+        done
+    else
+        add_sync_result "gemini-skills" "仅当目标缺失时复制" "" "error" "未找到源目录"
+    fi
 }

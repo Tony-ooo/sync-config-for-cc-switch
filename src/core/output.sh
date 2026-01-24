@@ -73,6 +73,12 @@ print_sync_section() {
         local skip_count=0
         local skip_reason=""
 
+        # 确定显示名称（将 *-skills 统一显示为 skills）
+        local display_name="$file"
+        if [[ "$file" =~ -skills$ ]]; then
+            display_name="skills"
+        fi
+
         for result in "${SYNC_RESULTS[@]}"; do
             IFS='|' read -r f_type f_strategy f_target f_status f_detail <<< "$result"
 
@@ -90,13 +96,22 @@ print_sync_section() {
                     if [ "$f_target" = "0" ]; then
                         file_results+=("  ✓ 源路径")
                     elif [ "$f_target" != "-1" ]; then
-                        file_results+=("  ✓ 目标路径${f_target}")
+                        if [ -n "$f_detail" ]; then
+                            file_results+=("  ✓ 目标路径${f_target}: $f_detail")
+                        else
+                            file_results+=("  ✓ 目标路径${f_target}")
+                        fi
                     fi
                     has_output=1
                 elif [ "$f_status" = "skip" ]; then
                     skip_count=$((skip_count + 1))
                     if [ -z "$skip_reason" ] && [ -n "$f_detail" ]; then
                         skip_reason="$f_detail"
+                    fi
+                    # 对于 skills 类型，也显示 skip 状态
+                    if [[ "$file" =~ -skills$ ]] && [ "$f_target" != "-1" ] && [ -n "$f_detail" ]; then
+                        file_results+=("  - 目标路径${f_target}: $f_detail")
+                        has_output=1
                     fi
                 elif [ "$f_status" = "warning" ]; then
                     if [ "$f_target" = "0" ]; then
@@ -120,7 +135,7 @@ print_sync_section() {
 
         # 输出文件标题
         if [ -n "$strategy" ]; then
-            echo "→ $file ($strategy)"
+            echo "→ $display_name ($strategy)"
         else
             continue
         fi
@@ -147,22 +162,28 @@ print_sync_section() {
 # 统一输出所有同步结果
 print_all_sync_results() {
     # Claude 配置同步
-    print_sync_section "Claude" "settings.json" "CLAUDE.md" ".claude.json"
+    print_sync_section "Claude" "settings.json" "CLAUDE.md" ".claude.json" "claude-skills"
 
     # Codex 配置同步
-    print_sync_section "Codex" "auth.json" "config.toml" "AGENTS.md"
+    print_sync_section "Codex" "auth.json" "config.toml" "AGENTS.md" "codex-skills"
 
     # Gemini 配置同步
     # 注意：Gemini 也有 settings.json，但策略说明不同，需要特殊处理
     echo "========== Gemini 配置同步 =========="
 
     # 手动处理 Gemini 的文件，确保 settings.json 使用正确的策略说明
-    for file in "google_accounts.json" "oauth_creds.json" ".env" "settings.json" "GEMINI.md"; do
+    for file in "google_accounts.json" "oauth_creds.json" ".env" "settings.json" "GEMINI.md" "gemini-skills"; do
         local file_results=()
         local strategy=""
         local has_output=0
         local skip_count=0
         local skip_reason=""
+
+        # 确定显示名称（将 gemini-skills 显示为 skills）
+        local display_name="$file"
+        if [ "$file" = "gemini-skills" ]; then
+            display_name="skills"
+        fi
 
         for result in "${SYNC_RESULTS[@]}"; do
             IFS='|' read -r f_type f_strategy f_target f_status f_detail <<< "$result"
@@ -181,13 +202,22 @@ print_all_sync_results() {
                     if [ "$f_target" = "0" ]; then
                         file_results+=("  ✓ 源路径")
                     elif [ "$f_target" != "-1" ]; then
-                        file_results+=("  ✓ 目标路径${f_target}")
+                        if [ -n "$f_detail" ]; then
+                            file_results+=("  ✓ 目标路径${f_target}: $f_detail")
+                        else
+                            file_results+=("  ✓ 目标路径${f_target}")
+                        fi
                     fi
                     has_output=1
                 elif [ "$f_status" = "skip" ]; then
                     skip_count=$((skip_count + 1))
                     if [ -z "$skip_reason" ] && [ -n "$f_detail" ]; then
                         skip_reason="$f_detail"
+                    fi
+                    # 对于 skills 类型，也显示 skip 状态
+                    if [[ "$file" =~ -skills$ ]] && [ "$f_target" != "-1" ] && [ -n "$f_detail" ]; then
+                        file_results+=("  - 目标路径${f_target}: $f_detail")
+                        has_output=1
                     fi
                 elif [ "$f_status" = "warning" ]; then
                     if [ "$f_target" = "0" ]; then
@@ -211,7 +241,7 @@ print_all_sync_results() {
 
         # 输出文件标题
         if [ -n "$strategy" ]; then
-            echo "→ $file ($strategy)"
+            echo "→ $display_name ($strategy)"
         else
             continue
         fi
