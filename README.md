@@ -7,12 +7,15 @@
 - [功能特性](#功能特性)
 - [依赖要求](#依赖要求)
 - [快速开始](#快速开始)
+- [项目架构](#项目架构)
 - [配置说明](#配置说明)
 - [使用方法](#使用方法)
 - [配置文件格式](#配置文件格式)
 - [同步逻辑说明](#同步逻辑说明)
+- [工作流程](#工作流程)
 - [常见问题](#常见问题)
 - [注意事项](#注意事项)
+- [开发指南](#开发指南)
 
 ## 🚀 功能特性
 
@@ -57,24 +60,27 @@
 
 ## 🎯 快速开始
 
-/path/to/your/.cc-switch 源配置目录结构如下：
+### 1. 项目目录结构
 
 ```bash
-├── .cc-switch/                      # 源配置目录（AI助手配置模板）
-│   ├── .claude/                     # Claude AI 配置
-│   │   ├── CLAUDE.md
-│   │   └── settings.json
-│   ├── .claude.json
-│   ├── .codex/                      # Codex 配置
-│   │   ├── AGENTS.md
-│   │   ├── auth.json
-│   │   └── config.toml
-│   └── .gemini/                     # Gemini AI 配置
-│       ├── .env
-│       ├── GEMINI.md
-│       ├── google_accounts.json
-│       ├── oauth_creds.json
-│       └── settings.json
+sync-config-for-cc-switch/
+├── sync_config.sh              # 主入口脚本
+├── sync_config.yml             # 配置文件
+└── src/                        # 源代码模块目录
+    ├── core/                   # 核心功能模块
+    │   ├── cli.sh             # 命令行参数处理
+    │   ├── config.sh          # 配置文件定位与解析
+    │   ├── deps.sh            # 依赖工具检测与安装
+    │   └── output.sh          # 输出格式化系统
+    ├── lib/                    # 通用函数库
+    │   └── common.sh          # 通用文件操作函数
+    ├── sync/                   # 同步模块
+    │   ├── claude.sh          # Claude 配置同步
+    │   ├── codex.sh           # Codex 配置同步
+    │   └── gemini.sh          # Gemini 配置同步
+    └── utils/                  # 工具模块
+        ├── directory.sh       # 目录准备
+        └── path.sh            # 路径验证与过滤
 ```
 
 ### 2. 配置 `sync_config.yml`
@@ -102,6 +108,43 @@ target_dirs:
 # 方式 3：查看帮助
 ./sync_config.sh -h
 ```
+
+## 🏗️ 项目架构
+
+### 模块化设计
+
+本项目采用模块化架构设计，将原 769 行单文件脚本重构为 114 行主脚本 + 9 个功能模块：
+
+#### 核心模块 (src/core/)
+
+- **cli.sh**: 命令行参数处理（-c, -h）
+- **config.sh**: 配置文件定位与解析（支持多种查找路径）
+- **deps.sh**: 依赖工具检测与自动安装（yq, jq）
+- **output.sh**: 统一的输出格式化系统
+
+#### 通用函数库 (src/lib/)
+
+- **common.sh**: 通用文件操作函数（复制、备份、JSON验证）
+
+#### 同步模块 (src/sync/)
+
+- **claude.sh**: Claude 配置智能合并同步
+- **codex.sh**: Codex 配置同步（保留 mcp_servers）
+- **gemini.sh**: Gemini 配置同步（保留 mcpServers）
+
+#### 工具模块 (src/utils/)
+
+- **path.sh**: 路径验证与过滤
+- **directory.sh**: 目录准备与创建
+
+### 架构优势
+
+- ✅ **职责分离**: 每个模块专注于单一功能
+- ✅ **易于测试**: 可以独立测试每个模块
+- ✅ **便于扩展**: 添加新功能只需新增模块
+- ✅ **代码复用**: 通用函数库减少重复代码
+- ✅ **维护性强**: 修改某个功能不影响其他模块
+- ✅ **可读性好**: 主脚本简洁清晰，逻辑一目了然
 
 ## ⚙️ 配置说明
 
@@ -168,30 +211,6 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 -h           # 显示帮助信息
 ```
 
-## 📄 配置文件格式
-
-### YAML 格式说明
-
-```yaml
-# 注释以 # 开头
-
-# 源配置目录（必填，仅允许一个）
-source_dir: /absolute/path/to/source
-
-# 目标路径列表（必填，至少一个）
-target_dirs:
-  - /path/to/target1    # 数组项以 - 开头
-  - /path/to/target2
-```
-
-### 路径格式支持
-
-| 格式 | 示例 | 说明 |
-|------|------|------|
-| **绝对路径** | `/home/user/project` | 推荐使用 |
-| **~ 扩展** | `~/workspace/project` | 自动展开为用户主目录 |
-| **环境变量** | `$HOME/project` | 自动展开环境变量 |
-
 ## 🔄 同步逻辑说明
 
 ### Claude 配置同步
@@ -231,23 +250,25 @@ target_dirs:
 ## 🛠️ 工作流程
 
 ```
-1. 🔧 检测并安装必要工具（yq, jq）← 首先执行，确保依赖就绪
+1. 🔧 解析命令行参数                    ← cli.sh
    ↓
-2. 📄 定位并加载配置文件（YAML 格式）
+2. 🔧 检测并安装必要工具（yq, jq）      ← deps.sh
    ↓
-3. ✅ 验证目标路径（存在性、可写性）
+3. 📄 定位并加载配置文件（YAML 格式）   ← config.sh
    ↓
-4. 📁 准备必要目录（.claude, .codex, .gemini）
+4. ✅ 验证源目录和目标路径              ← config.sh, path.sh
    ↓
-5. 🔄 同步 .claude 配置文件
+5. 📁 准备必要目录                      ← directory.sh
    ↓
-6. 🔄 同步 .claude.json
+6. 🔄 同步 Claude 配置文件              ← claude.sh
    ↓
-7. 🔄 同步 .codex 配置文件
+7. 🔄 同步 Codex 配置文件               ← codex.sh
    ↓
-8. 🔄 同步 .gemini 配置文件
+8. 🔄 同步 Gemini 配置文件              ← gemini.sh
    ↓
-9. ✨ 完成同步
+9. 📊 统一输出所有同步结果              ← output.sh
+   ↓
+10. ✨ 完成同步
 ```
 
 ## ❓ 常见问题
@@ -329,48 +350,30 @@ target_dirs:
    - 保持源配置目录（`.cc-switch`）的结构完整
    - 确保所有必要的子目录（`.claude`、`.codex`、`.gemini`）都存在
 
-## 📊 输出示例
+## 🔧 开发指南
 
-```bash
-$ ./sync_config.sh
+### 添加新的同步模块
 
-✓ 已加载配置: /path/to/sync_config.yml
-  源目录: /path/to/.cc-switch
-  目标数量: 2
-========== 配置文件同步工具 ==========
-配置文件: /path/to/sync_config.yml
-源目录: /path/to/.cc-switch
-目标目录: 2 个
-==========================================
+如需为新的 AI 工具添加配置同步支持，请按以下步骤操作：
 
-✓ 已检测到 yq 工具
-✓ 已检测到 jq 工具
-正在检查目标路径...
-✓ 有效路径: /path/to/project1
-✓ 有效路径: /path/to/project2
-共找到 2 个有效目标路径
-==============================================
-正在准备目标目录...
-✓ 已准备必要的子目录
-正在复制 .claude 目录文件...
-✓ 已更新 /path/to/project1/.claude/settings.json (智能合并)
-✓ 已更新 /path/to/project2/.claude/settings.json (智能合并)
-✓ 已同步 settings.json (智能合并)
-正在同步 .claude.json 文件...
-✓ 已更新 /path/to/.cc-switch/.claude.json (hasCompletedOnboarding=true)
-✓ 已更新 /path/to/project1/.claude.json (hasCompletedOnboarding=true)
-✓ 已更新 /path/to/project2/.claude.json (hasCompletedOnboarding=true)
-正在复制 .codex 目录文件...
-✓ 已复制 auth.json
-✓ 已更新 config.toml (保留目标 mcp_servers)
-正在复制 .gemini 目录文件...
-✓ 已复制 google_accounts.json
-✓ 已复制 oauth_creds.json
-✓ 已复制 .env
-✓ 已同步 settings.json (保留目标 mcpServers)
-==========================================
-配置文件同步完成!
-```
+1. **创建同步模块**: 在 `src/sync/` 目录下创建新文件（如 `newtool.sh`）
+2. **实现同步函数**: 参考 `claude.sh` 或 `gemini.sh` 的实现模式
+3. **使用通用函数**: 优先使用 `src/lib/common.sh` 中的通用函数
+4. **记录同步结果**: 使用 `add_sync_result()` 记录每个文件的同步结果
+5. **更新主脚本**: 在 `sync_config.sh` 中加载并调用新模块
+
+### 模块开发规范
+
+- **依赖声明**: 在文件头部注释中声明依赖的模块和工具
+- **函数命名**: 使用 `<模块名>_<功能>` 格式（如 `sync_claude_settings_json_file`）
+- **错误处理**: 使用 `set -e` 确保错误时立即退出
+- **输出规范**: 使用 `output.sh` 提供的函数统一输出格式
+
+### 扩展现有功能
+
+- **添加新配置文件**: 在对应的同步模块中添加处理函数
+- **修改合并策略**: 修改 `src/lib/common.sh` 或具体同步模块中的合并逻辑
+- **优化输出格式**: 修改 `src/core/output.sh` 中的输出函数
 
 ## 📄 许可证
 

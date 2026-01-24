@@ -2,11 +2,11 @@
 # 编码: UTF-8
 
 # 源配置目录（支持绝对路径、~ 和环境变量）
-source_dir: /home/dev/workspace/Project/sync_config_test/.cc-switch
+source_dir: /home/dev/workspace/Project/sync-config-for-cc-switch/.cc-switch
 
 # 目标路径列表
 target_dirs:
-  - /home/dev/workspace/Project/sync_config_test/test-path/path1
-  - /home/dev/workspace/Project/sync_config_test/test-path/path2
+  - /home/dev/workspace/Project/sync-config-for-cc-switch/test-path/path1
+  - /home/dev/workspace/Project/sync-config-for-cc-switch/test-path/path2
   # 可以继续添加更多路径
   # - /path/to/another/target
