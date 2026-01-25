@@ -1,3 +1,5 @@
 .DS_Store
 .cc-switch/
 test-path/
+sync_config.yml
+.history
