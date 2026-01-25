@@ -39,11 +39,29 @@ check_and_install_yq() {
 
         # 创建用户 bin 目录
         local bin_dir="$HOME/.local/bin"
-        mkdir -p "$bin_dir"
+        mkdir -p "$bin_dir" || {
+            echo "错误: 无法创建目录 $bin_dir"
+            exit 1
+        }
+
+        # 保存当前目录
+        local current_dir="$(pwd)"
+
+        # 切换到目标目录再下载（避免路径问题）
+        cd "$bin_dir" || exit 1
 
         # 下载 Windows 版本
-        curl -L -o "$bin_dir/yq.exe" https://github.com/mikefarah/yq/releases/latest/download/yq_windows_amd64.exe
-        chmod +x "$bin_dir/yq.exe"
+        if curl -L -o "yq.exe" https://github.com/mikefarah/yq/releases/latest/download/yq_windows_amd64.exe; then
+            chmod +x "yq.exe"
+            echo "✓ yq 下载成功"
+        else
+            echo "错误: 下载 yq 失败"
+            cd "$current_dir"
+            exit 1
+        fi
+
+        # 切换回原目录
+        cd "$current_dir"
 
         # 添加到 PATH（如果尚未添加）
         if [[ ":$PATH:" != *":$bin_dir:"* ]]; then
@@ -98,11 +116,29 @@ check_and_install_jq() {
 
         # 创建用户 bin 目录
         local bin_dir="$HOME/.local/bin"
-        mkdir -p "$bin_dir"
+        mkdir -p "$bin_dir" || {
+            echo "错误: 无法创建目录 $bin_dir"
+            exit 1
+        }
+
+        # 保存当前目录
+        local current_dir="$(pwd)"
+
+        # 切换到目标目录再下载（避免路径问题）
+        cd "$bin_dir" || exit 1
 
         # 下载 Windows 版本
-        curl -L -o "$bin_dir/jq.exe" https://github.com/jqlang/jq/releases/latest/download/jq-windows-amd64.exe
-        chmod +x "$bin_dir/jq.exe"
+        if curl -L -o "jq.exe" https://github.com/jqlang/jq/releases/latest/download/jq-windows-amd64.exe; then
+            chmod +x "jq.exe"
+            echo "✓ jq 下载成功"
+        else
+            echo "错误: 下载 jq 失败"
+            cd "$current_dir"
+            exit 1
+        fi
+
+        # 切换回原目录
+        cd "$current_dir"
 
         # 添加到 PATH（如果尚未添加）
         if [[ ":$PATH:" != *":$bin_dir:"* ]]; then
