@@ -80,6 +80,9 @@ parse_config_file() {
 
     SOURCE_DIR=$(eval echo "$raw_source_dir")
 
+    # 转换 WSL 路径（如果适用）
+    SOURCE_DIR=$(convert_wsl_path_for_bash "$SOURCE_DIR")
+
     # 解析 target_dirs 数组
     local target_count=$(yq eval '.target_dirs | length' "$yq_config_file" 2>/dev/null)
     if [ -z "$target_count" ] || [ "$target_count" = "0" ] || [ "$target_count" = "null" ]; then
@@ -97,6 +100,10 @@ parse_config_file() {
             fi
 
             local expanded_path=$(eval echo "$raw_path")
+
+            # 转换 WSL 路径（如果适用）
+            expanded_path=$(convert_wsl_path_for_bash "$expanded_path")
+
             TARGET_DIRS+=("$expanded_path")
         fi
     done

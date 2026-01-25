@@ -38,10 +38,26 @@ prepare_directories() {
             continue
         fi
 
-        if ! mkdir -p "${mkdir_args[@]}" 2>/dev/null; then
-            echo "错误: 无法创建必要目录: $target"
-            echo "请检查路径和权限设置"
-            exit 1
+        # 对于 WSL 路径，不使用 -p 选项（避免尝试创建虚拟的中间目录）
+        # 因为目标路径已通过验证，父目录必然存在
+        if [[ "$target" =~ ^//wsl ]]; then
+            # WSL 路径：逐个创建目录，不使用 -p
+            for dir in "${mkdir_args[@]}"; do
+                if [ ! -d "$dir" ]; then
+                    if ! mkdir "$dir" 2>/dev/null; then
+                        echo "错误: 无法创建必要目录: $dir"
+                        echo "请检查路径和权限设置"
+                        exit 1
+                    fi
+                fi
+            done
+        else
+            # 普通路径：使用 -p 选项
+            if ! mkdir -p "${mkdir_args[@]}" 2>/dev/null; then
+                echo "错误: 无法创建必要目录: $target"
+                echo "请检查路径和权限设置"
+                exit 1
+            fi
         fi
     done
     echo "✓ 已准备必要的子目录"

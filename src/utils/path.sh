@@ -21,6 +21,9 @@ filter_valid_paths() {
         # 展开 ~ 或环境变量
         dir=$(eval echo "$entry")
 
+        # 转换 WSL 路径（如果适用）
+        dir=$(convert_wsl_path_for_bash "$dir")
+
         # 检查路径是否存在
         if [ ! -d "$dir" ]; then
             echo "✗ 路径不存在,已跳过: $dir"

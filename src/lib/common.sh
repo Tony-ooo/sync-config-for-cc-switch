@@ -29,6 +29,40 @@ convert_path_for_windows() {
     fi
 }
 
+# WSL 路径转换辅助函数（Git Bash/MINGW 环境）
+# 将 Windows UNC 格式的 WSL 路径转换为 Git Bash 可识别的格式
+# 支持格式：
+#   - \\wsl.localhost\... -> //wsl.localhost/... (WSL UNC 格式)
+#   - \\wsl$\... -> //wsl$/... (旧版 WSL UNC 格式)
+#   - //wsl.localhost/... -> //wsl.localhost/... (已转换格式，保持不变)
+#   - 其他路径保持不变
+convert_wsl_path_for_bash() {
+    local path="$1"
+
+    # 仅在 Git Bash/MINGW/CYGWIN 环境下执行转换
+    if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
+        # 检测 WSL UNC 路径格式（已被转换为正斜杠的情况）
+        # 注意：config.sh 中的 sed 's|\\|/|g' 会将 \\wsl.localhost\ 转换为 //wsl.localhost/
+        # 所以这里直接检查是否以 //wsl 开头即可，无需再次转换
+        if [[ "$path" =~ ^//wsl ]]; then
+            # 已经是正确格式，直接返回
+            echo "$path"
+        # 检测原始的双反斜杠格式（如果还没被转换）
+        elif [[ "$path" =~ ^\\\\wsl\. ]] || [[ "$path" =~ ^\\\\wsl\$ ]]; then
+            # 转换规则：
+            # 1. 开头的 \\ 替换为 //
+            # 2. 其他所有 \\ 替换为 /
+            echo "$path" | sed 's|^\\\\|//|; s|\\\\|/|g'
+        else
+            # 非 WSL 路径，保持不变
+            echo "$path"
+        fi
+    else
+        # 非 Windows 环境，保持不变
+        echo "$path"
+    fi
+}
+
 # 仅当目标缺失时复制文件
 # 参数:
 #   $1 = source_file (源文件路径)
