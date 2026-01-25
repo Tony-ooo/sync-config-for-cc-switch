@@ -5,8 +5,32 @@
 source_dir: /home/dev/workspace/Project/sync-config-for-cc-switch/.cc-switch
 
 # 目标路径列表
+# 支持多种路径格式，工具会自动处理路径转换和验证
 target_dirs:
+  # Linux/macOS 绝对路径
   - /home/dev/workspace/Project/sync-config-for-cc-switch/test-path/path1
   - /home/dev/workspace/Project/sync-config-for-cc-switch/test-path/path2
+
+  # 波浪号扩展（代表用户主目录）
+  # - ~/projects/my-project
+
+  # 环境变量（如 $HOME、$USER 等）
+  # - $HOME/workspace/another-project
+
+  # Windows 路径（正斜杠格式）
+  # - D:/ProgramData/my_projects/project1
+
+  # Windows 路径（反斜杠格式）
+  # - D:\ProgramData\my_projects\project2
+
+  # Git Bash 格式（Windows 上的 Unix 风格路径）
+  # - /d/ProgramData/my_projects/project3
+
+  # WSL 路径（UNC 格式）
+  # - \\wsl.localhost\Ubuntu\home\username\project
+
+  # WSL 路径（旧版格式）
+  # - \\wsl$\Ubuntu\home\username\project
+
   # 可以继续添加更多路径
   # - /path/to/another/target

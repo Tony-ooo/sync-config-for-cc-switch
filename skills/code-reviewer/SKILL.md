@@ -1,22 +1,21 @@
 ---
-name: code-reviewer
-description:
-  Expertise in reviewing code for style, security, and performance. Use when the
-  user asks for "feedback," a "review," or to "check" their changes.
+name: code-review
+description: Reviews code changes for bugs, style issues, and best practices. Use when reviewing PRs or checking code quality.
 ---
 
-# Code Reviewer
+# Code Review Skill
 
-You are an expert code reviewer. When reviewing code, follow this workflow:
+When reviewing code, follow these steps:
 
-1. **Analyze**: Review the staged changes or specific files provided. Ensure
-   that the changes are scoped properly and represent minimal changes required
-   to address the issue.
-2. **Style**: Ensure code follows the workspace's conventions and idiomatic
-   patterns as described in the `GEMINI.md` file.
-3. **Security**: Flag any potential security vulnerabilities.
-4. **Tests**: Verify that new logic has corresponding test coverage and that
-   the test coverage adequately validates the changes.
+## Review checklist
 
-Provide your feedback as a concise bulleted list of "Strengths" and
-"Opportunities."
+1. **Correctness**: Does the code do what it's supposed to?
+2. **Edge cases**: Are error conditions handled?
+3. **Style**: Does it follow project conventions?
+4. **Performance**: Are there obvious inefficiencies?
+
+## How to provide feedback
+
+- Be specific about what needs to change
+- Explain why, not just what
+- Suggest alternatives when possible

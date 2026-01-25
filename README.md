@@ -10,7 +10,6 @@
 - [项目架构](#项目架构)
 - [配置说明](#配置说明)
 - [使用方法](#使用方法)
-- [配置文件格式](#配置文件格式)
 - [同步逻辑说明](#同步逻辑说明)
 - [工作流程](#工作流程)
 - [常见问题](#常见问题)
@@ -26,6 +25,8 @@
 - ✅ **路径验证**：自动检查目标路径的存在性和可写性
 - ✅ **自动备份**：非法 JSON 或格式错误时自动备份原文件
 - ✅ **位置独立**：可在任意路径运行，不依赖脚本所在目录
+- ✅ **技能模块管理**：支持同步 AI 编程助手的技能模块（代码审查、文档处理、UI/UX 设计等）
+- ✅ **跨平台支持**：支持 Linux、macOS、Windows (Git Bash)、WSL
 
 ### 支持的配置文件
 
@@ -33,15 +34,18 @@
 |------|---------|---------|
 | **Claude** | `.claude/settings.json` | 智能合并，保留目标字段 |
 | **Claude** | `.claude/CLAUDE.md` | 仅当目标缺失时复制 |
+| **Claude** | `.claude/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
 | **Codex** | `.codex/config.toml` | 合并，保留目标 `mcp_servers` |
 | **Codex** | `.codex/auth.json` | 直接覆盖 |
 | **Codex** | `.codex/AGENTS.md` | 仅当目标缺失时复制 |
+| **Codex** | `.codex/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
 | **Gemini** | `.gemini/settings.json` | 合并，保留目标 `mcpServers` |
 | **Gemini** | `.gemini/google_accounts.json` | 直接覆盖 |
 | **Gemini** | `.gemini/oauth_creds.json` | 直接覆盖 |
 | **Gemini** | `.gemini/.env` | 直接覆盖 |
 | **Gemini** | `.gemini/GEMINI.md` | 仅当目标缺失时复制 |
+| **Gemini** | `.gemini/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
 
 ## 📦 依赖要求
 
@@ -57,6 +61,8 @@
 - ✅ Debian/Ubuntu
 - ✅ RHEL/CentOS/Fedora
 - ✅ macOS (需要 Homebrew)
+- ✅ Windows (Git Bash)
+- ✅ WSL (Windows Subsystem for Linux)
 
 ## 🎯 快速开始
 
@@ -66,6 +72,7 @@
 sync-config-for-cc-switch/
 ├── sync_config.sh              # 主入口脚本
 ├── sync_config.yml             # 配置文件
+├── skills/                     # 技能模块目录
 └── src/                        # 源代码模块目录
     ├── core/                   # 核心功能模块
     │   ├── cli.sh             # 命令行参数处理
@@ -229,6 +236,14 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   - 设置或更新 `hasCompletedOnboarding: true`
   - 保留其他字段不变
 
+#### `.claude/skills/`
+- **策略**：仅当目标缺失时复制，保留目标已有文件
+- **逻辑**：
+  - 递归复制源 skills 目录到目标
+  - 仅复制目标路径中不存在的文件
+  - 自动过滤系统文件和临时文件
+  - 保护目标已有的技能文件不被覆盖
+
 ### Codex 配置同步
 
 #### `.codex/config.toml`
@@ -238,6 +253,14 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   2. 提取目标配置中的 `mcp_servers` 配置
   3. 合并：源配置（已过滤）+ 目标 mcp_servers
 
+#### `.codex/skills/`
+- **策略**：仅当目标缺失时复制，保留目标已有文件
+- **逻辑**：
+  - 递归复制源 skills 目录到目标
+  - 仅复制目标路径中不存在的文件
+  - 自动过滤系统文件和临时文件
+  - 保护目标已有的技能文件不被覆盖
+
 ### Gemini 配置同步
 
 #### `.gemini/settings.json`
@@ -246,6 +269,14 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   1. 从源配置中过滤掉 `mcpServers` 字段
   2. 提取目标配置中的 `mcpServers` 字段
   3. 合并：`(目标去掉mcpServers) * 源(已过滤)` + 目标 mcpServers
+
+#### `.gemini/skills/`
+- **策略**：仅当目标缺失时复制，保留目标已有文件
+- **逻辑**：
+  - 递归复制源 skills 目录到目标
+  - 仅复制目标路径中不存在的文件
+  - 自动过滤系统文件和临时文件
+  - 保护目标已有的技能文件不被覆盖
 
 ## 🛠️ 工作流程
 
@@ -261,10 +292,24 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 5. 📁 准备必要目录                      ← directory.sh
    ↓
 6. 🔄 同步 Claude 配置文件              ← claude.sh
+   ├─ settings.json (智能合并)
+   ├─ CLAUDE.md (缺失时复制)
+   ├─ skills/ (递归复制，保留已有)
+   └─ .claude.json (确保引导完成)
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
+   ├─ config.toml (合并，保留 mcp_servers)
+   ├─ auth.json (直接覆盖)
+   ├─ AGENTS.md (缺失时复制)
+   └─ skills/ (递归复制，保留已有)
    ↓
 8. 🔄 同步 Gemini 配置文件              ← gemini.sh
+   ├─ settings.json (合并，保留 mcpServers)
+   ├─ google_accounts.json (直接覆盖)
+   ├─ oauth_creds.json (直接覆盖)
+   ├─ .env (直接覆盖)
+   ├─ GEMINI.md (缺失时复制)
+   └─ skills/ (递归复制，保留已有)
    ↓
 9. 📊 统一输出所有同步结果              ← output.sh
    ↓
@@ -318,6 +363,35 @@ target_dirs:
 # 每天凌晨 2 点同步配置
 0 2 * * * /path/to/sync_config.sh >> /var/log/sync_config.log 2>&1
 ```
+
+### Q7: 技能目录会被覆盖吗？
+
+不会。技能目录使用"仅当目标缺失时复制"策略：
+- 仅复制目标路径中不存在的文件
+- 保护目标已有的技能文件不被覆盖
+- 自动过滤系统文件和临时文件
+- 确保用户自定义的技能不会丢失
+
+### Q8: 在 Windows 上如何使用？
+
+本工具支持在 Windows 上通过 Git Bash 或 WSL 运行：
+
+**Git Bash**：
+```bash
+# 在 Git Bash 中运行
+./sync_config.sh
+```
+
+**WSL (Windows Subsystem for Linux)**：
+```bash
+# 在 WSL 终端中运行
+./sync_config.sh
+```
+
+**注意事项**：
+- 确保已安装 Git Bash 或 WSL
+- 路径格式会自动处理（Windows 路径 ↔ Unix 路径）
+- yq 和 jq 工具会自动安装
 
 ## ⚠️ 注意事项
 
