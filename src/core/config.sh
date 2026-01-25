@@ -53,16 +53,35 @@ parse_config_file() {
     SOURCE_DIR=""
     TARGET_DIRS=()
 
+    # 转换路径为 Windows 格式（如果在 Git Bash/MINGW 环境）
+    local yq_config_file="$config_file"
+    if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
+        # 支持多种路径格式：/d/path, D:\path, D:/path
+        if [[ "$config_file" =~ ^/([a-z])/ ]]; then
+            # Git Bash 格式: /d/path -> D:/path
+            yq_config_file=$(echo "$config_file" | sed 's|^/\([a-z]\)/|\U\1:/|')
+        elif [[ "$config_file" =~ ^[A-Za-z]:\\ ]]; then
+            # Windows 反斜杠格式: D:\path -> D:/path
+            yq_config_file=$(echo "$config_file" | sed 's|\\|/|g')
+        fi
+    fi
+
     # 解析 source_dir
-    local raw_source_dir=$(yq eval '.source_dir' "$config_file" 2>/dev/null)
+    local raw_source_dir=$(yq eval '.source_dir' "$yq_config_file" 2>/dev/null)
     if [ -z "$raw_source_dir" ] || [ "$raw_source_dir" = "null" ]; then
         echo "错误: 配置文件未定义 source_dir" >&2
         exit 1
     fi
+
+    # 转换 Windows 反斜杠路径为正斜杠（在 eval 之前，避免转义问题）
+    if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
+        raw_source_dir=$(echo "$raw_source_dir" | sed 's|\\|/|g')
+    fi
+
     SOURCE_DIR=$(eval echo "$raw_source_dir")
 
     # 解析 target_dirs 数组
-    local target_count=$(yq eval '.target_dirs | length' "$config_file" 2>/dev/null)
+    local target_count=$(yq eval '.target_dirs | length' "$yq_config_file" 2>/dev/null)
     if [ -z "$target_count" ] || [ "$target_count" = "0" ] || [ "$target_count" = "null" ]; then
         echo "错误: 配置文件未定义 target_dirs 或为空" >&2
         exit 1
@@ -70,8 +89,13 @@ parse_config_file() {
 
     # 读取每个目标路径
     for ((i=0; i<target_count; i++)); do
-        local raw_path=$(yq eval ".target_dirs[$i]" "$config_file" 2>/dev/null)
+        local raw_path=$(yq eval ".target_dirs[$i]" "$yq_config_file" 2>/dev/null)
         if [ -n "$raw_path" ] && [ "$raw_path" != "null" ]; then
+            # 转换 Windows 反斜杠路径为正斜杠（在 eval 之前，避免转义问题）
+            if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
+                raw_path=$(echo "$raw_path" | sed 's|\\|/|g')
+            fi
+
             local expanded_path=$(eval echo "$raw_path")
             TARGET_DIRS+=("$expanded_path")
         fi

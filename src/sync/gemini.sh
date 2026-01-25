@@ -37,7 +37,10 @@ sync_gemini_settings_json_file() {
     tmp_file="${target_file}.tmp.$$"
 
     # 先生成"过滤掉 mcpServers 的源配置"
-    if ! jq 'del(.mcpServers)' "$source_file" > "$filtered_tmp" 2>/dev/null; then
+    local jq_source=$(convert_path_for_windows "$source_file")
+    local jq_filtered=$(convert_path_for_windows "$filtered_tmp")
+
+    if ! jq 'del(.mcpServers)' "$jq_source" > "$jq_filtered" 2>/dev/null; then
         rm -f "$filtered_tmp" 2>/dev/null || true
         add_sync_result "settings.json" "合并，保留目标 mcpServers" "" "error" "无法解析源文件"
         exit 1
@@ -73,7 +76,10 @@ sync_gemini_settings_json_file() {
     fi
 
     # 情况 3: 目标为合法 JSON -> 合并写入并保留目标 mcpServers
-    if jq -e . "$target_file" >/dev/null 2>&1; then
+    local jq_target=$(convert_path_for_windows "$target_file")
+    local jq_tmp=$(convert_path_for_windows "$tmp_file")
+
+    if jq -e . "$jq_target" >/dev/null 2>&1; then
         if jq -s '
             .[0] as $source |
             .[1] as $target |
@@ -81,7 +87,7 @@ sync_gemini_settings_json_file() {
             ($target.mcpServers) as $mcp |
             (( $target | del(.mcpServers) ) * $source) as $merged |
             if $has_mcp then ($merged + {mcpServers: $mcp}) else $merged end
-        ' "$filtered_tmp" "$target_file" > "$tmp_file" 2>/dev/null; then
+        ' "$jq_filtered" "$jq_target" > "$jq_tmp" 2>/dev/null; then
             if mv -f "$tmp_file" "$target_file"; then
                 rm -f "$filtered_tmp" 2>/dev/null || true
                 add_sync_result "settings.json" "合并，保留目标 mcpServers" "$target_root" "success"

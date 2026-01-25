@@ -4,6 +4,31 @@
 # 职责: 提供通用的文件操作函数，减少重复代码
 # 依赖: output.sh (add_sync_result), jq
 
+# 路径转换辅助函数（Git Bash/MINGW 环境）
+# 将路径转换为 Windows 程序可识别的格式
+# 支持格式：
+#   - /d/path -> D:/path (Git Bash 格式)
+#   - D:\path -> D:/path (Windows 反斜杠格式)
+#   - D:/path -> D:/path (Windows 正斜杠格式，保持不变)
+convert_path_for_windows() {
+    local path="$1"
+
+    if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
+        # 情况 1: Git Bash 格式 /d/path -> D:/path
+        if [[ "$path" =~ ^/([a-z])/ ]]; then
+            echo "$path" | sed 's|^/\([a-z]\)/|\U\1:/|'
+        # 情况 2: Windows 反斜杠格式 D:\path -> D:/path
+        elif [[ "$path" =~ ^[A-Za-z]:\\ ]]; then
+            echo "$path" | sed 's|\\|/|g'
+        # 情况 3: 已经是 Windows 正斜杠格式，保持不变
+        else
+            echo "$path"
+        fi
+    else
+        echo "$path"
+    fi
+}
+
 # 仅当目标缺失时复制文件
 # 参数:
 #   $1 = source_file (源文件路径)
@@ -103,7 +128,8 @@ is_valid_json() {
         return 1
     fi
 
-    if jq empty "$file_path" 2>/dev/null; then
+    local jq_path=$(convert_path_for_windows "$file_path")
+    if jq empty "$jq_path" 2>/dev/null; then
         return 0
     else
         return 1

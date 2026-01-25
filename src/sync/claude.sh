@@ -59,7 +59,11 @@ sync_claude_settings_json_file() {
     fi
 
     # 情况 3: 合法 JSON -> 顶层字段合并（目标 + 源，源字段整体替换，保留目标独有字段）
-    if jq -s '.[1] + .[0]' "$source_file" "$target_file" > "$tmp_file" 2>/dev/null; then
+    local jq_source=$(convert_path_for_windows "$source_file")
+    local jq_target=$(convert_path_for_windows "$target_file")
+    local jq_tmp=$(convert_path_for_windows "$tmp_file")
+
+    if jq -s '.[1] + .[0]' "$jq_source" "$jq_target" > "$jq_tmp" 2>/dev/null; then
         if mv -f "$tmp_file" "$target_file"; then
             add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "success"
         else
@@ -163,7 +167,10 @@ sync_claude_json_file() {
 
     # 情况 3: 合法 JSON -> 仅更新字段
     temp_file="${target_file}.tmp.$$"
-    if jq '.hasCompletedOnboarding = true' "$target_file" > "$temp_file" 2>/dev/null; then
+    local jq_target=$(convert_path_for_windows "$target_file")
+    local jq_temp=$(convert_path_for_windows "$temp_file")
+
+    if jq '.hasCompletedOnboarding = true' "$jq_target" > "$jq_temp" 2>/dev/null; then
         if mv -f "$temp_file" "$target_file"; then
             add_sync_result ".claude.json" "确保 hasCompletedOnboarding=true" "$target_root" "success"
         else
