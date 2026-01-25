@@ -218,7 +218,33 @@ copy_directory_if_missing() {
 
         # 确保父目录存在
         target_parent="$(dirname "$target_file")"
-        mkdir -p "$target_parent" 2>/dev/null || true
+
+        # 对于 WSL 路径，需要特殊处理目录创建
+        if [[ "$target_parent" =~ ^//wsl ]]; then
+            # WSL 路径：递归创建目录结构，不使用 -p
+            # 首先确保 target_dir 存在
+            if [ ! -d "$target_dir" ]; then
+                mkdir "$target_dir" 2>/dev/null || true
+            fi
+
+            # 然后从 target_dir 开始，逐级创建缺失的子目录
+            local current_dir="$target_dir"
+            local remaining_path="${target_parent#$target_dir}"
+            remaining_path="${remaining_path#/}"
+
+            if [ -n "$remaining_path" ]; then
+                IFS='/' read -ra dirs <<< "$remaining_path"
+                for dir in "${dirs[@]}"; do
+                    current_dir="$current_dir/$dir"
+                    if [ ! -d "$current_dir" ]; then
+                        mkdir "$current_dir" 2>/dev/null || true
+                    fi
+                done
+            fi
+        else
+            # 普通路径：使用 -p 选项
+            mkdir -p "$target_parent" 2>/dev/null || true
+        fi
 
         # 检查目标文件是否为目录
         if [ -d "$target_file" ]; then
