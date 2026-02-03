@@ -3,3 +3,4 @@
 test-path/
 sync_config.yml
 .history
+*node_modules/
