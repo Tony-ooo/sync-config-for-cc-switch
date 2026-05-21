@@ -4,21 +4,17 @@
 # 职责: 目录准备
 # 依赖: VALID_TARGET_DIRS
 
-# 目录准备函数:创建必要的 .claude/.codex/.gemini 子目录
+# 目录准备函数:创建必要的 .claude/.codex 子目录
 prepare_directories() {
     echo "正在准备目标目录..."
     local source_has_claude=0
     local source_has_codex=0
-    local source_has_gemini=0
 
     if [ -d ".claude" ]; then
         source_has_claude=1
     fi
     if [ -d ".codex" ]; then
         source_has_codex=1
-    fi
-    if [ -d ".gemini" ]; then
-        source_has_gemini=1
     fi
 
     for target in "${VALID_TARGET_DIRS[@]}"; do
@@ -29,9 +25,6 @@ prepare_directories() {
         fi
         if [ "$source_has_codex" -eq 1 ]; then
             mkdir_args+=("$target/.codex")
-        fi
-        if [ "$source_has_gemini" -eq 1 ]; then
-            mkdir_args+=("$target/.gemini")
         fi
 
         if [ ${#mkdir_args[@]} -eq 0 ]; then

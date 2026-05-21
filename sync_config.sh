@@ -2,7 +2,7 @@
 
 # ==================== 配置文件同步工具 ====================
 # 版本: 2.0 (模块化重构版)
-# 功能: 从源目录同步 Claude/Codex/Gemini 配置到多个目标目录
+# 功能: 从源目录同步 Claude/Codex 配置到多个目标目录
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,7 +35,6 @@ load_modules() {
     # 4. 同步模块
     source_module "$SCRIPT_DIR/src/sync/claude.sh"
     source_module "$SCRIPT_DIR/src/sync/codex.sh"
-    source_module "$SCRIPT_DIR/src/sync/gemini.sh"
 }
 
 # 主函数
@@ -64,13 +63,8 @@ main() {
         copy_codex_files
     fi
 
-    # 5. 同步 Gemini 配置
-    if [ -d ".gemini" ]; then
-        copy_gemini_files
-    fi
-
     echo
-    # 6. 输出所有同步结果
+    # 5. 输出所有同步结果
     print_all_sync_results
 
     echo "=========================================="

@@ -1,6 +1,6 @@
 # 配置文件同步工具
 
-一个强大的配置文件同步工具，用于在多个项目目录之间同步 AI 编程助手（Claude、Codex、Gemini）的配置文件。支持智能合并、路径过滤、备份保护等特性。
+一个强大的配置文件同步工具，用于在多个项目目录之间同步 AI 编程助手（Claude、Codex）的配置文件。支持智能合并、路径过滤、备份保护等特性。
 
 ## 📋 目录
 
@@ -40,13 +40,6 @@
 | **Codex** | `.codex/auth.json` | 直接覆盖 |
 | **Codex** | `.codex/AGENTS.md` | 仅当目标缺失时复制 |
 | **Codex** | `.codex/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
-| **Gemini** | `.gemini/settings.json` | 合并，保留目标 `mcpServers` |
-| **Gemini** | `.gemini/google_accounts.json` | 直接覆盖 |
-| **Gemini** | `.gemini/oauth_creds.json` | 直接覆盖 |
-| **Gemini** | `.gemini/.env` | 直接覆盖 |
-| **Gemini** | `.gemini/GEMINI.md` | 仅当目标缺失时复制 |
-| **Gemini** | `.gemini/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
-
 ## 📦 依赖要求
 
 ### 必需工具
@@ -84,7 +77,6 @@ sync-config-for-cc-switch/
     ├── sync/                   # 同步模块
     │   ├── claude.sh          # Claude 配置同步
     │   ├── codex.sh           # Codex 配置同步
-    │   └── gemini.sh          # Gemini 配置同步
     └── utils/                  # 工具模块
         ├── directory.sh       # 目录准备
         └── path.sh            # 路径验证与过滤
@@ -137,8 +129,6 @@ target_dirs:
 
 - **claude.sh**: Claude 配置智能合并同步
 - **codex.sh**: Codex 配置同步（保留 mcp_servers）
-- **gemini.sh**: Gemini 配置同步（保留 mcpServers）
-
 #### 工具模块 (src/utils/)
 
 - **path.sh**: 路径验证与过滤
@@ -261,23 +251,6 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   - 自动过滤系统文件和临时文件
   - 保护目标已有的技能文件不被覆盖
 
-### Gemini 配置同步
-
-#### `.gemini/settings.json`
-- **策略**：合并，保留目标 `mcpServers`
-- **逻辑**：
-  1. 从源配置中过滤掉 `mcpServers` 字段
-  2. 提取目标配置中的 `mcpServers` 字段
-  3. 合并：`(目标去掉mcpServers) * 源(已过滤)` + 目标 mcpServers
-
-#### `.gemini/skills/`
-- **策略**：仅当目标缺失时复制，保留目标已有文件
-- **逻辑**：
-  - 递归复制源 skills 目录到目标
-  - 仅复制目标路径中不存在的文件
-  - 自动过滤系统文件和临时文件
-  - 保护目标已有的技能文件不被覆盖
-
 ## 🛠️ 工作流程
 
 ```
@@ -303,17 +276,9 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
    ├─ AGENTS.md (缺失时复制)
    └─ skills/ (递归复制，保留已有)
    ↓
-8. 🔄 同步 Gemini 配置文件              ← gemini.sh
-   ├─ settings.json (合并，保留 mcpServers)
-   ├─ google_accounts.json (直接覆盖)
-   ├─ oauth_creds.json (直接覆盖)
-   ├─ .env (直接覆盖)
-   ├─ GEMINI.md (缺失时复制)
-   └─ skills/ (递归复制，保留已有)
+8. 📊 统一输出所有同步结果              ← output.sh
    ↓
-9. 📊 统一输出所有同步结果              ← output.sh
-   ↓
-10. ✨ 完成同步
+9. ✨ 完成同步
 ```
 
 ## ❓ 常见问题
@@ -398,7 +363,7 @@ target_dirs:
 ### 安全性
 
 1. **敏感信息**：
-   - `.codex/auth.json`、`.gemini/oauth_creds.json` 等包含认证信息
+   - `.codex/auth.json` 等包含认证信息
    - 确保源配置目录和配置文件的权限正确（建议 `600` 或 `700`）
    - 不要将包含敏感信息的配置文件提交到公开的代码仓库
 
@@ -422,7 +387,7 @@ target_dirs:
 
 3. **目录结构**：
    - 保持源配置目录（`.cc-switch`）的结构完整
-   - 确保所有必要的子目录（`.claude`、`.codex`、`.gemini`）都存在
+   - 确保所有必要的子目录（`.claude`、`.codex`）都存在
 
 ## 🔧 开发指南
 
@@ -431,7 +396,7 @@ target_dirs:
 如需为新的 AI 工具添加配置同步支持，请按以下步骤操作：
 
 1. **创建同步模块**: 在 `src/sync/` 目录下创建新文件（如 `newtool.sh`）
-2. **实现同步函数**: 参考 `claude.sh` 或 `gemini.sh` 的实现模式
+2. **实现同步函数**: 参考 `claude.sh` 或 `codex.sh` 的实现模式
 3. **使用通用函数**: 优先使用 `src/lib/common.sh` 中的通用函数
 4. **记录同步结果**: 使用 `add_sync_result()` 记录每个文件的同步结果
 5. **更新主脚本**: 在 `sync_config.sh` 中加载并调用新模块
