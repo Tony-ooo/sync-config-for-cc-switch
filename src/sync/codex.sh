@@ -6,22 +6,22 @@
 
 # 复制 .codex 目录文件: AGENTS.md, auth.json, config.toml
 copy_codex_files() {
-    # 复制 AGENTS.md（仅当目标缺失时复制，避免覆盖目标侧自定义内容）
+    # 复制 AGENTS.md（强制覆盖）
     if [ -f ".codex/AGENTS.md" ]; then
         for target in "${VALID_TARGET_DIRS[@]}"; do
-            copy_if_missing ".codex/AGENTS.md" "$target/.codex/AGENTS.md" "$target" "AGENTS.md"
+            copy_and_force_overwrite ".codex/AGENTS.md" "$target/.codex/AGENTS.md" "$target" "AGENTS.md"
         done
     else
-        add_sync_result "AGENTS.md" "仅当目标缺失时复制" "" "error" "未找到源文件"
+        add_sync_result "AGENTS.md" "强制覆盖" "" "error" "未找到源文件"
     fi
 
     # 复制 auth.json
     if [ -f ".codex/auth.json" ]; then
         for target in "${VALID_TARGET_DIRS[@]}"; do
-            copy_and_overwrite ".codex/auth.json" "$target/.codex/auth.json" "$target" "auth.json"
+            copy_and_force_overwrite ".codex/auth.json" "$target/.codex/auth.json" "$target" "auth.json"
         done
     else
-        add_sync_result "auth.json" "直接覆盖" "" "error" "未找到源文件"
+        add_sync_result "auth.json" "强制覆盖" "" "error" "未找到源文件"
     fi
 
     # 复制 config.toml (合并写入,保留目标路径的 mcp_servers)
@@ -77,12 +77,12 @@ copy_codex_files() {
         add_sync_result "config.toml" "合并，保留目标 mcp_servers" "" "error" "未找到源文件"
     fi
 
-    # 复制 skills 目录（仅当目标缺失时复制，保留目标已有文件）
+    # 复制 skills 目录（保留目标侧其他 skill，覆盖同名 skill）
     if [ -d ".codex/skills" ]; then
         for target in "${VALID_TARGET_DIRS[@]}"; do
-            copy_directory_if_missing ".codex/skills" "$target/.codex/skills" "$target" "codex-skills"
+            copy_skills_overwrite_same_name ".codex/skills" "$target/.codex/skills" "$target" "codex-skills"
         done
     else
-        add_sync_result "codex-skills" "仅当目标缺失时复制" "" "error" "未找到源目录"
+        add_sync_result "codex-skills" "保留目标已有文件，覆盖同名 skill" "" "error" "未找到源目录"
     fi
 }

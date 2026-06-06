@@ -63,58 +63,18 @@ convert_wsl_path_for_bash() {
     fi
 }
 
-# 仅当目标缺失时复制文件
-# 参数:
-#   $1 = source_file (源文件路径)
-#   $2 = target_file (目标文件路径)
-#   $3 = target_root (目标根路径，用于结果记录)
-#   $4 = file_type (文件类型，如 "CLAUDE.md")
-copy_if_missing() {
-    local source_file="$1"
-    local target_file="$2"
-    local target_root="$3"
-    local file_type="$4"
-    local strategy="仅当目标缺失时复制"
-
-    if [ -z "$source_file" ] || [ -z "$target_file" ]; then
-        return 0
-    fi
-
-    if [ ! -f "$source_file" ]; then
-        return 0
-    fi
-
-    if [ -d "$target_file" ]; then
-        add_sync_result "$file_type" "$strategy" "$target_root" "warning" "目标是目录"
-        return 0
-    fi
-
-    # 目标文件已存在，跳过
-    if [ -e "$target_file" ]; then
-        add_sync_result "$file_type" "$strategy" "$target_root" "skip" "目标已存在"
-        return 0
-    fi
-
-    # 复制文件
-    if cp -f "$source_file" "$target_file"; then
-        add_sync_result "$file_type" "$strategy" "$target_root" "success"
-    else
-        add_sync_result "$file_type" "$strategy" "$target_root" "warning" "无法创建"
-    fi
-}
-
-# 直接覆盖目标文件
+# 强制覆盖目标文件
 # 参数:
 #   $1 = source_file (源文件路径)
 #   $2 = target_file (目标文件路径)
 #   $3 = target_root (目标根路径，用于结果记录)
 #   $4 = file_type (文件类型，如 "auth.json")
-copy_and_overwrite() {
+copy_and_force_overwrite() {
     local source_file="$1"
     local target_file="$2"
     local target_root="$3"
     local file_type="$4"
-    local strategy="直接覆盖"
+    local strategy="强制覆盖"
 
     if [ -z "$source_file" ] || [ -z "$target_file" ]; then
         return 0
@@ -129,12 +89,196 @@ copy_and_overwrite() {
         return 0
     fi
 
-    # 直接复制覆盖
     if cp -f "$source_file" "$target_file"; then
         add_sync_result "$file_type" "$strategy" "$target_root" "success"
     else
         add_sync_result "$file_type" "$strategy" "$target_root" "warning" "无法写入"
     fi
+}
+
+should_skip_sync_item() {
+    local item_path="$1"
+    local item_name
+    item_name="$(basename "$item_path")"
+
+    case "$item_name" in
+        .DS_Store|Thumbs.db|desktop.ini|.gitkeep|.*.swp|*~)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+ensure_sync_dir() {
+    local dir_path="$1"
+    local current_dir
+    local parent_dir
+    local missing_dirs=()
+    local i
+
+    if [ -z "$dir_path" ]; then
+        return 1
+    fi
+
+    if [ -d "$dir_path" ]; then
+        return 0
+    fi
+
+    if [[ "$dir_path" =~ ^//wsl ]]; then
+        current_dir="$dir_path"
+        while [ ! -d "$current_dir" ]; do
+            missing_dirs+=("$current_dir")
+            parent_dir="$(dirname "$current_dir")"
+            if [ "$parent_dir" = "$current_dir" ]; then
+                return 1
+            fi
+            current_dir="$parent_dir"
+        done
+
+        for ((i = ${#missing_dirs[@]} - 1; i >= 0; i--)); do
+            if [ ! -d "${missing_dirs[$i]}" ]; then
+                mkdir "${missing_dirs[$i]}" 2>/dev/null || return 1
+            fi
+        done
+        return 0
+    fi
+
+    mkdir -p "$dir_path" 2>/dev/null
+}
+
+copy_filtered_item() {
+    local source_item="$1"
+    local target_item="$2"
+    local child
+    local relative_path
+    local target_child
+    local target_parent
+    local copy_failed=0
+
+    if [ -d "$source_item" ] && [ ! -L "$source_item" ]; then
+        if ! ensure_sync_dir "$target_item"; then
+            return 1
+        fi
+
+        while IFS= read -r -d '' child; do
+            if should_skip_sync_item "$child"; then
+                continue
+            fi
+
+            relative_path="${child#$source_item}"
+            relative_path="${relative_path#/}"
+            target_child="$target_item/$relative_path"
+
+            if [ -d "$child" ] && [ ! -L "$child" ]; then
+                if ! ensure_sync_dir "$target_child"; then
+                    copy_failed=1
+                fi
+            elif [ -f "$child" ] || [ -L "$child" ]; then
+                target_parent="$(dirname "$target_child")"
+                if ensure_sync_dir "$target_parent" && cp -f "$child" "$target_child"; then
+                    :
+                else
+                    copy_failed=1
+                fi
+            fi
+        done < <(find "$source_item" -mindepth 1 -print0 2>/dev/null)
+
+        return "$copy_failed"
+    fi
+
+    cp -f "$source_item" "$target_item"
+}
+
+# 复制 skills 目录（保留目标侧其他 skill，覆盖同名顶层 skill）
+# 参数:
+#   $1 = source_dir (源 skills 目录路径，相对于 SOURCE_DIR)
+#   $2 = target_dir (目标 skills 目录路径，绝对路径)
+#   $3 = target_root (目标根路径，用于结果记录)
+#   $4 = dir_type (目录类型，如 "claude-skills")
+copy_skills_overwrite_same_name() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local target_root="$3"
+    local dir_type="$4"
+    local source_item
+    local skill_name
+    local target_item
+    local success_count=0
+    local overwrite_count=0
+    local warning_count=0
+
+    if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
+        return 0
+    fi
+
+    if [ ! -d "$source_dir" ]; then
+        return 0
+    fi
+
+    if [ ! -d "$target_dir" ]; then
+        ensure_sync_dir "$target_dir" || true
+    fi
+
+    if [ ! -d "$target_dir" ]; then
+        add_sync_result "$dir_type" "保留目标已有文件，覆盖同名 skill" "$target_root" "warning" "无法创建目标目录"
+        return 0
+    fi
+
+    while IFS= read -r -d '' source_item; do
+        skill_name="$(basename "$source_item")"
+        if should_skip_sync_item "$source_item"; then
+            continue
+        fi
+
+        target_item="$target_dir/$skill_name"
+
+        if [ -e "$target_item" ] || [ -L "$target_item" ]; then
+            if rm -rf "$target_item" 2>/dev/null; then
+                overwrite_count=$((overwrite_count + 1))
+            else
+                warning_count=$((warning_count + 1))
+                continue
+            fi
+        fi
+
+        if copy_filtered_item "$source_item" "$target_item"; then
+            success_count=$((success_count + 1))
+        else
+            warning_count=$((warning_count + 1))
+        fi
+    done < <(find "$source_dir" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+
+    local total=$((success_count + warning_count))
+    if [ $total -eq 0 ]; then
+        return 0
+    fi
+
+    local detail=""
+    local status="success"
+
+    if [ $success_count -gt 0 ]; then
+        detail="已同步 ${success_count} 个 skill"
+    fi
+
+    if [ $overwrite_count -gt 0 ]; then
+        if [ -n "$detail" ]; then
+            detail="${detail}, 覆盖 ${overwrite_count} 个同名 skill"
+        else
+            detail="覆盖 ${overwrite_count} 个同名 skill"
+        fi
+    fi
+
+    if [ $warning_count -gt 0 ]; then
+        if [ -n "$detail" ]; then
+            detail="${detail}, ${warning_count} 个失败"
+        else
+            detail="${warning_count} 个 skill 同步失败"
+        fi
+        status="warning"
+    fi
+
+    add_sync_result "$dir_type" "保留目标已有文件，覆盖同名 skill" "$target_root" "$status" "$detail"
 }
 
 # 安全备份文件
@@ -168,138 +312,4 @@ is_valid_json() {
     else
         return 1
     fi
-}
-
-# 递归复制目录（仅复制目标侧缺失的文件，汇总输出结果）
-# 参数:
-#   $1 = source_dir (源目录路径，相对于 SOURCE_DIR)
-#   $2 = target_dir (目标目录路径，绝对路径)
-#   $3 = target_root (目标根路径，用于结果记录)
-#   $4 = dir_type (目录类型，如 "skills")
-copy_directory_if_missing() {
-    local source_dir="$1"
-    local target_dir="$2"
-    local target_root="$3"
-    local dir_type="$4"
-    local source_file
-    local relative_path
-    local target_file
-    local target_parent
-    local success_count=0
-    local skip_count=0
-    local warning_count=0
-
-    if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
-        return 0
-    fi
-
-    # 验证源目录存在
-    if [ ! -d "$source_dir" ]; then
-        return 0
-    fi
-
-    # 遍历所有文件（排除目录和系统文件）
-    while IFS= read -r -d '' source_file; do
-        # 跳过常见的系统文件和临时文件
-        local filename
-        filename="$(basename "$source_file")"
-        case "$filename" in
-            .DS_Store|Thumbs.db|desktop.ini|.gitkeep|.*.swp|*~)
-                continue
-                ;;
-        esac
-
-        # 计算相对路径: 去掉源目录前缀和开头的斜杠
-        relative_path="${source_file#$source_dir}"
-        relative_path="${relative_path#/}"
-
-        # 构造目标文件路径
-        target_file="$target_dir/$relative_path"
-
-        # 确保父目录存在
-        target_parent="$(dirname "$target_file")"
-
-        # 对于 WSL 路径，需要特殊处理目录创建
-        if [[ "$target_parent" =~ ^//wsl ]]; then
-            # WSL 路径：递归创建目录结构，不使用 -p
-            # 首先确保 target_dir 存在
-            if [ ! -d "$target_dir" ]; then
-                mkdir "$target_dir" 2>/dev/null || true
-            fi
-
-            # 然后从 target_dir 开始，逐级创建缺失的子目录
-            local current_dir="$target_dir"
-            local remaining_path="${target_parent#$target_dir}"
-            remaining_path="${remaining_path#/}"
-
-            if [ -n "$remaining_path" ]; then
-                IFS='/' read -ra dirs <<< "$remaining_path"
-                for dir in "${dirs[@]}"; do
-                    current_dir="$current_dir/$dir"
-                    if [ ! -d "$current_dir" ]; then
-                        mkdir "$current_dir" 2>/dev/null || true
-                    fi
-                done
-            fi
-        else
-            # 普通路径：使用 -p 选项
-            mkdir -p "$target_parent" 2>/dev/null || true
-        fi
-
-        # 检查目标文件是否为目录
-        if [ -d "$target_file" ]; then
-            warning_count=$((warning_count + 1))
-            continue
-        fi
-
-        # 检查目标文件是否已存在
-        if [ -e "$target_file" ]; then
-            skip_count=$((skip_count + 1))
-        else
-            # 复制文件
-            if cp -f "$source_file" "$target_file"; then
-                success_count=$((success_count + 1))
-            else
-                warning_count=$((warning_count + 1))
-            fi
-        fi
-    done < <(find "$source_dir" -type f -print0 2>/dev/null)
-
-    # 生成汇总信息
-    local total=$((success_count + skip_count + warning_count))
-    if [ $total -eq 0 ]; then
-        # 没有文件需要复制
-        return 0
-    fi
-
-    local detail=""
-    local status="success"
-
-    if [ $success_count -gt 0 ]; then
-        detail="已复制 ${success_count} 个文件"
-        status="success"
-    fi
-
-    if [ $skip_count -gt 0 ]; then
-        if [ -n "$detail" ]; then
-            detail="${detail}, ${skip_count} 个已存在"
-        else
-            detail="${skip_count} 个文件已存在"
-        fi
-        if [ $success_count -eq 0 ]; then
-            status="skip"
-        fi
-    fi
-
-    if [ $warning_count -gt 0 ]; then
-        if [ -n "$detail" ]; then
-            detail="${detail}, ${warning_count} 个失败"
-        else
-            detail="${warning_count} 个文件复制失败"
-        fi
-        status="warning"
-    fi
-
-    # 记录汇总结果
-    add_sync_result "$dir_type" "仅当目标缺失时复制" "$target_root" "$status" "$detail"
 }

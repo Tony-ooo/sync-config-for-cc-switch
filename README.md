@@ -33,13 +33,13 @@
 | 工具 | 配置文件 | 同步策略 |
 |------|---------|---------|
 | **Claude** | `.claude/settings.json` | 智能合并，保留目标字段 |
-| **Claude** | `.claude/CLAUDE.md` | 仅当目标缺失时复制 |
-| **Claude** | `.claude/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
+| **Claude** | `.claude/CLAUDE.md` | 强制覆盖 |
+| **Claude** | `.claude/skills/` | 保留目标已有文件，覆盖同名 skill |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
 | **Codex** | `.codex/config.toml` | 合并，保留目标 `mcp_servers` |
-| **Codex** | `.codex/auth.json` | 直接覆盖 |
-| **Codex** | `.codex/AGENTS.md` | 仅当目标缺失时复制 |
-| **Codex** | `.codex/skills/` | 仅当目标缺失时复制，保留目标已有文件 |
+| **Codex** | `.codex/auth.json` | 强制覆盖 |
+| **Codex** | `.codex/AGENTS.md` | 强制覆盖 |
+| **Codex** | `.codex/skills/` | 保留目标已有文件，覆盖同名 skill |
 ## 📦 依赖要求
 
 ### 必需工具
@@ -227,12 +227,12 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   - 保留其他字段不变
 
 #### `.claude/skills/`
-- **策略**：仅当目标缺失时复制，保留目标已有文件
+- **策略**：保留目标已有文件，覆盖同名 skill
 - **逻辑**：
-  - 递归复制源 skills 目录到目标
-  - 仅复制目标路径中不存在的文件
+  - 同步源 skills 目录下的顶层 skill 到目标
+  - 目标存在同名 skill → 删除后写入源侧 skill
+  - 目标存在其他 skill → 保留不变
   - 自动过滤系统文件和临时文件
-  - 保护目标已有的技能文件不被覆盖
 
 ### Codex 配置同步
 
@@ -244,12 +244,12 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   3. 合并：源配置（已过滤）+ 目标 mcp_servers
 
 #### `.codex/skills/`
-- **策略**：仅当目标缺失时复制，保留目标已有文件
+- **策略**：保留目标已有文件，覆盖同名 skill
 - **逻辑**：
-  - 递归复制源 skills 目录到目标
-  - 仅复制目标路径中不存在的文件
+  - 同步源 skills 目录下的顶层 skill 到目标
+  - 目标存在同名 skill → 删除后写入源侧 skill
+  - 目标存在其他 skill → 保留不变
   - 自动过滤系统文件和临时文件
-  - 保护目标已有的技能文件不被覆盖
 
 ## 🛠️ 工作流程
 
@@ -266,15 +266,15 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
    ↓
 6. 🔄 同步 Claude 配置文件              ← claude.sh
    ├─ settings.json (智能合并)
-   ├─ CLAUDE.md (缺失时复制)
-   ├─ skills/ (递归复制，保留已有)
+   ├─ CLAUDE.md (强制覆盖)
+   ├─ skills/ (保留目标已有文件，覆盖同名 skill)
    └─ .claude.json (确保引导完成)
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
    ├─ config.toml (合并，保留 mcp_servers)
-   ├─ auth.json (直接覆盖)
-   ├─ AGENTS.md (缺失时复制)
-   └─ skills/ (递归复制，保留已有)
+   ├─ auth.json (强制覆盖)
+   ├─ AGENTS.md (强制覆盖)
+   └─ skills/ (保留目标已有文件，覆盖同名 skill)
    ↓
 8. 📊 统一输出所有同步结果              ← output.sh
    ↓
@@ -296,10 +296,11 @@ target_dirs:
 
 ### Q2: 脚本会覆盖我的自定义配置吗？
 
-不会。脚本使用智能合并策略：
+会按配置类型采用不同策略：
 - **JSON 配置**：深度合并，保留目标路径的特定字段（如 `mcpServers`）
-- **Markdown 文件**：仅当目标不存在时才复制
-- **认证文件**：直接覆盖（确保认证信息一致）
+- **Markdown 文件**：`.claude/CLAUDE.md` 和 `.codex/AGENTS.md` 会强制覆盖
+- **技能目录**：保留目标已有其他 skill，但源侧同名 skill 会覆盖目标侧同名 skill
+- **认证文件**：强制覆盖（确保认证信息一致）
 
 ### Q3: 如果目标路径不存在会怎样？
 
@@ -331,11 +332,11 @@ target_dirs:
 
 ### Q7: 技能目录会被覆盖吗？
 
-不会。技能目录使用"仅当目标缺失时复制"策略：
-- 仅复制目标路径中不存在的文件
-- 保护目标已有的技能文件不被覆盖
+不会整体覆盖。技能目录使用"保留目标已有文件，覆盖同名 skill"策略：
+- 源侧存在同名 skill 时，覆盖目标侧同名 skill
+- 目标侧其他 skill 保留不变
 - 自动过滤系统文件和临时文件
-- 确保用户自定义的技能不会丢失
+- 用户自定义 skill 只要不与源侧同名，就不会丢失
 
 ### Q8: 在 Windows 上如何使用？
 

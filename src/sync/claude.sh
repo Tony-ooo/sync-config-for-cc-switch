@@ -98,22 +98,22 @@ copy_claude_files() {
         add_sync_result "settings.json" "智能合并，保留目标字段" "" "error" "未找到源文件"
     fi
 
-    # 复制 CLAUDE.md（仅当目标缺失时复制，避免覆盖目标侧自定义内容）
+    # 复制 CLAUDE.md（强制覆盖）
     if [ -f ".claude/CLAUDE.md" ]; then
         for target in "${VALID_TARGET_DIRS[@]}"; do
-            copy_if_missing ".claude/CLAUDE.md" "$target/.claude/CLAUDE.md" "$target" "CLAUDE.md"
+            copy_and_force_overwrite ".claude/CLAUDE.md" "$target/.claude/CLAUDE.md" "$target" "CLAUDE.md"
         done
     else
-        add_sync_result "CLAUDE.md" "仅当目标缺失时复制" "" "error" "未找到源文件"
+        add_sync_result "CLAUDE.md" "强制覆盖" "" "error" "未找到源文件"
     fi
 
-    # 复制 skills 目录（仅当目标缺失时复制，保留目标已有文件）
+    # 复制 skills 目录（保留目标侧其他 skill，覆盖同名 skill）
     if [ -d ".claude/skills" ]; then
         for target in "${VALID_TARGET_DIRS[@]}"; do
-            copy_directory_if_missing ".claude/skills" "$target/.claude/skills" "$target" "claude-skills"
+            copy_skills_overwrite_same_name ".claude/skills" "$target/.claude/skills" "$target" "claude-skills"
         done
     else
-        add_sync_result "claude-skills" "仅当目标缺失时复制" "" "error" "未找到源目录"
+        add_sync_result "claude-skills" "保留目标已有文件，覆盖同名 skill" "" "error" "未找到源目录"
     fi
 }
 
