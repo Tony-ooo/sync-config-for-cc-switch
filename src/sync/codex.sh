@@ -120,15 +120,40 @@ split_codex_config_by_managed_roots() {
 append_codex_config_part() {
     local tmp_file="$1"
     local part_file="$2"
+    local trimmed_file
 
     if [ ! -s "$part_file" ]; then
+        return 0
+    fi
+
+    trimmed_file="${tmp_file}.part.$$"
+    awk '
+        /^[[:space:]]*$/ {
+            if (seen) {
+                pending_blank = pending_blank $0 ORS
+            }
+            next
+        }
+        {
+            if (seen && pending_blank != "") {
+                printf "%s", pending_blank
+            }
+            pending_blank = ""
+            seen = 1
+            print
+        }
+    ' "$part_file" > "$trimmed_file"
+
+    if [ ! -s "$trimmed_file" ]; then
+        rm -f "$trimmed_file" 2>/dev/null || true
         return 0
     fi
 
     if [ -s "$tmp_file" ]; then
         printf '\n' >> "$tmp_file"
     fi
-    cat "$part_file" >> "$tmp_file"
+    cat "$trimmed_file" >> "$tmp_file"
+    rm -f "$trimmed_file" 2>/dev/null || true
 }
 
 sync_codex_config_toml() {
@@ -178,10 +203,10 @@ sync_codex_config_toml() {
     fi
 
     : > "$tmp_file"
-    append_codex_config_part "$tmp_file" "$target_unmanaged_root"
     append_codex_config_part "$tmp_file" "$source_managed_root"
-    append_codex_config_part "$tmp_file" "$target_unmanaged_tables"
+    append_codex_config_part "$tmp_file" "$target_unmanaged_root"
     append_codex_config_part "$tmp_file" "$source_managed_tables"
+    append_codex_config_part "$tmp_file" "$target_unmanaged_tables"
 
     if mv -f "$tmp_file" "$target_file"; then
         add_sync_result "config.toml" "$strategy" "$target_root" "success"
