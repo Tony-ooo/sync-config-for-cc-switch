@@ -36,7 +36,7 @@
 | **Claude** | `.claude/CLAUDE.md` | 强制覆盖 |
 | **Claude** | `.claude/skills/` | 保留目标已有文件，覆盖同名 skill |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
-| **Codex** | `.codex/config.toml` | 合并，保留目标 `mcp_servers` |
+| **Codex** | `.codex/config.toml` | 受管顶层域同步，保留目标非受管配置 |
 | **Codex** | `.codex/auth.json` | 强制覆盖 |
 | **Codex** | `.codex/AGENTS.md` | 强制覆盖 |
 | **Codex** | `.codex/skills/` | 保留目标已有文件，覆盖同名 skill |
@@ -128,7 +128,7 @@ target_dirs:
 #### 同步模块 (src/sync/)
 
 - **claude.sh**: Claude 配置智能合并同步
-- **codex.sh**: Codex 配置同步（保留 mcp_servers）
+- **codex.sh**: Codex 配置同步（受管顶层域同步）
 #### 工具模块 (src/utils/)
 
 - **path.sh**: 路径验证与过滤
@@ -237,11 +237,12 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 ### Codex 配置同步
 
 #### `.codex/config.toml`
-- **策略**：合并，保留目标 `mcp_servers`
+- **策略**：受管顶层域同步，保留目标非受管配置
 - **逻辑**：
-  1. 从源配置中过滤掉所有 `mcp_servers` 相关配置
-  2. 提取目标配置中的 `mcp_servers` 配置
-  3. 合并：源配置（已过滤）+ 目标 mcp_servers
+  1. 将以下顶层域视为受管域：`model_provider`、`model`、`model_reasoning_effort`、`approval_policy`、`sandbox_mode`、`suppress_unstable_features_warning`、`web_search`、`model_providers`、`features`、`analytics`、`feedback`、`notice`、`windows`
+  2. 目标配置中的受管域会先移除
+  3. 源配置中存在的受管域会写入目标；源配置中删除的受管域也会从目标删除
+  4. 目标配置中的非受管域保持不变，例如本地 `mcp_servers`
 
 #### `.codex/skills/`
 - **策略**：保留目标已有文件，覆盖同名 skill
@@ -271,7 +272,7 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
    └─ .claude.json (确保引导完成)
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
-   ├─ config.toml (合并，保留 mcp_servers)
+   ├─ config.toml (受管顶层域同步，保留非受管配置)
    ├─ auth.json (强制覆盖)
    ├─ AGENTS.md (强制覆盖)
    └─ skills/ (保留目标已有文件，覆盖同名 skill)
