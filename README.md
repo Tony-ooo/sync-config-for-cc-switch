@@ -95,6 +95,35 @@ target_dirs:
   - /path/to/project3
 ```
 
+`target_dirs` 也支持结构化写法，用于声明目标路径的布局：
+
+```yaml
+target_dirs:
+  # 旧写法等价于 layout: root + tool: all
+  - /path/to/project1
+
+  # root 布局：写入 /path/to/project2/.claude 和 /path/to/project2/.codex
+  - path: /path/to/project2
+    layout: root
+    tool: all
+
+  # direct 布局：路径本身就是 Codex 配置目录
+  - path: $HOME/.openclaw/acpx/codex-home
+    layout: direct
+    tool: codex
+
+  # direct 布局：路径本身就是 Claude 配置目录
+  - path: $HOME/.openclaw/acpx/claude-home
+    layout: direct
+    tool: claude
+```
+
+布局说明：
+- `layout: root`：目标路径是根目录，Claude 写入 `.claude/`，Codex 写入 `.codex/`
+- `layout: direct`：目标路径本身就是某个工具的配置目录，必须指定 `tool: claude` 或 `tool: codex`
+- `tool: all`：仅适用于 `root` 布局
+- Claude direct 布局会将 `.claude.json` 同步到 direct 目录的上一级目录
+
 ### 3. 运行同步
 
 ```bash

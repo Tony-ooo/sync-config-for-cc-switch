@@ -2,7 +2,7 @@
 
 # ==================== 配置文件定位与解析模块 ====================
 # 职责: 配置文件定位与解析
-# 导出变量: CONFIG_PATH, SOURCE_DIR, TARGET_DIRS
+# 导出变量: CONFIG_PATH, SOURCE_DIR, TARGET_DIRS, TARGET_LAYOUTS, TARGET_TOOLS
 # 依赖: yq
 
 # 配置文件定位函数
@@ -52,6 +52,8 @@ parse_config_file() {
 
     SOURCE_DIR=""
     TARGET_DIRS=()
+    TARGET_LAYOUTS=()
+    TARGET_TOOLS=()
 
     # 转换路径为 Windows 格式（如果在 Git Bash/MINGW 环境）
     local yq_config_file="$config_file"
@@ -92,7 +94,22 @@ parse_config_file() {
 
     # 读取每个目标路径
     for ((i=0; i<target_count; i++)); do
-        local raw_path=$(yq eval ".target_dirs[$i]" "$yq_config_file" 2>/dev/null)
+        local entry_type
+        local raw_path
+        local layout
+        local tool
+
+        entry_type=$(yq eval ".target_dirs[$i] | type" "$yq_config_file" 2>/dev/null)
+        if [ "$entry_type" = "!!map" ]; then
+            raw_path=$(yq eval ".target_dirs[$i].path" "$yq_config_file" 2>/dev/null)
+            layout=$(yq eval ".target_dirs[$i].layout // \"root\"" "$yq_config_file" 2>/dev/null)
+            tool=$(yq eval ".target_dirs[$i].tool // \"all\"" "$yq_config_file" 2>/dev/null)
+        else
+            raw_path=$(yq eval ".target_dirs[$i]" "$yq_config_file" 2>/dev/null)
+            layout="root"
+            tool="all"
+        fi
+
         if [ -n "$raw_path" ] && [ "$raw_path" != "null" ]; then
             # 转换 Windows 反斜杠路径为正斜杠（在 eval 之前，避免转义问题）
             if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
@@ -105,6 +122,8 @@ parse_config_file() {
             expanded_path=$(convert_wsl_path_for_bash "$expanded_path")
 
             TARGET_DIRS+=("$expanded_path")
+            TARGET_LAYOUTS+=("$layout")
+            TARGET_TOOLS+=("$tool")
         fi
     done
 }

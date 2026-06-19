@@ -17,6 +17,23 @@ target_dirs:
   # 环境变量（如 $HOME、$USER 等）
   # - $HOME/workspace/another-project
 
+  # 结构化写法：layout=root 表示目标是根目录，会写入 .claude/.codex 子目录
+  # - path: $HOME/workspace/root-layout-project
+  #   layout: root
+  #   tool: all
+
+  # direct 写法：目标路径本身就是工具配置目录
+  # Codex 会写入 config.toml、auth.json、AGENTS.md、skills/
+  # - path: $HOME/.openclaw/acpx/codex-home
+  #   tool: codex
+  #   layout: direct
+
+  # Claude 会写入 settings.json、CLAUDE.md、skills/
+  # .claude.json 会同步到该 direct 目录的上一级目录
+  # - path: $HOME/.openclaw/acpx/claude-home
+  #   tool: claude
+  #   layout: direct
+
   # Windows 路径（正斜杠格式）
   # - D:/ProgramData/my_projects/project1
 

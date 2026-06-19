@@ -221,8 +221,11 @@ sync_codex_config_toml() {
 copy_codex_files() {
     # 复制 AGENTS.md（强制覆盖）
     if [ -f ".codex/AGENTS.md" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do
             copy_and_force_overwrite ".codex/AGENTS.md" "$target/.codex/AGENTS.md" "$target" "AGENTS.md"
+        done
+        for target in "${VALID_CODEX_DIRECT_DIRS[@]}"; do
+            copy_and_force_overwrite ".codex/AGENTS.md" "$target/AGENTS.md" "$target" "AGENTS.md"
         done
     else
         add_sync_result "AGENTS.md" "强制覆盖" "" "error" "未找到源文件"
@@ -230,8 +233,11 @@ copy_codex_files() {
 
     # 复制 auth.json
     if [ -f ".codex/auth.json" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do
             copy_and_force_overwrite ".codex/auth.json" "$target/.codex/auth.json" "$target" "auth.json"
+        done
+        for target in "${VALID_CODEX_DIRECT_DIRS[@]}"; do
+            copy_and_force_overwrite ".codex/auth.json" "$target/auth.json" "$target" "auth.json"
         done
     else
         add_sync_result "auth.json" "强制覆盖" "" "error" "未找到源文件"
@@ -239,8 +245,12 @@ copy_codex_files() {
 
     # 复制 config.toml (受管顶层域以源为准,目标非受管配置保留)
     if [ -f ".codex/config.toml" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do
             target_file="$target/.codex/config.toml"
+            sync_codex_config_toml ".codex/config.toml" "$target_file" "$target"
+        done
+        for target in "${VALID_CODEX_DIRECT_DIRS[@]}"; do
+            target_file="$target/config.toml"
             sync_codex_config_toml ".codex/config.toml" "$target_file" "$target"
         done
     else
@@ -249,8 +259,11 @@ copy_codex_files() {
 
     # 复制 skills 目录（保留目标侧其他 skill，覆盖同名 skill）
     if [ -d ".codex/skills" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do
             copy_skills_overwrite_same_name ".codex/skills" "$target/.codex/skills" "$target" "codex-skills"
+        done
+        for target in "${VALID_CODEX_DIRECT_DIRS[@]}"; do
+            copy_skills_overwrite_same_name ".codex/skills" "$target/skills" "$target" "codex-skills"
         done
     else
         add_sync_result "codex-skills" "保留目标已有文件，覆盖同名 skill" "" "error" "未找到源目录"

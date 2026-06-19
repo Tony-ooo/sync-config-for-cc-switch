@@ -91,8 +91,11 @@ sync_claude_settings_json_file() {
 copy_claude_files() {
     # 同步 settings.json（智能合并，保留目标侧字段）
     if [ -f ".claude/settings.json" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
             sync_claude_settings_json_file ".claude/settings.json" "$target/.claude/settings.json" "$target"
+        done
+        for target in "${VALID_CLAUDE_DIRECT_DIRS[@]}"; do
+            sync_claude_settings_json_file ".claude/settings.json" "$target/settings.json" "$target"
         done
     else
         add_sync_result "settings.json" "智能合并，保留目标字段" "" "error" "未找到源文件"
@@ -100,8 +103,11 @@ copy_claude_files() {
 
     # 复制 CLAUDE.md（强制覆盖）
     if [ -f ".claude/CLAUDE.md" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
             copy_and_force_overwrite ".claude/CLAUDE.md" "$target/.claude/CLAUDE.md" "$target" "CLAUDE.md"
+        done
+        for target in "${VALID_CLAUDE_DIRECT_DIRS[@]}"; do
+            copy_and_force_overwrite ".claude/CLAUDE.md" "$target/CLAUDE.md" "$target" "CLAUDE.md"
         done
     else
         add_sync_result "CLAUDE.md" "强制覆盖" "" "error" "未找到源文件"
@@ -109,8 +115,11 @@ copy_claude_files() {
 
     # 复制 skills 目录（保留目标侧其他 skill，覆盖同名 skill）
     if [ -d ".claude/skills" ]; then
-        for target in "${VALID_TARGET_DIRS[@]}"; do
+        for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
             copy_skills_overwrite_same_name ".claude/skills" "$target/.claude/skills" "$target" "claude-skills"
+        done
+        for target in "${VALID_CLAUDE_DIRECT_DIRS[@]}"; do
+            copy_skills_overwrite_same_name ".claude/skills" "$target/skills" "$target" "claude-skills"
         done
     else
         add_sync_result "claude-skills" "保留目标已有文件，覆盖同名 skill" "" "error" "未找到源目录"
@@ -195,8 +204,17 @@ sync_claude_json_file() {
 }
 
 copy_claude_json() {
-    # 遍历所有有效目标路径，确保目标的 .claude.json 处于已完成引导状态
-    for target in "${VALID_TARGET_DIRS[@]}"; do
+    local target
+    local target_parent
+
+    # root 布局: .claude.json 位于目标根目录
+    for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
         sync_claude_json_file "$target/.claude.json" "$target"
+    done
+
+    # direct 布局: 目标路径本身是 .claude 目录, .claude.json 位于其上一级目录
+    for target in "${VALID_CLAUDE_DIRECT_DIRS[@]}"; do
+        target_parent="$(dirname "$target")"
+        sync_claude_json_file "$target_parent/.claude.json" "$target"
     done
 }
