@@ -34,12 +34,12 @@
 |------|---------|---------|
 | **Claude** | `.claude/settings.json` | 智能合并，保留目标字段 |
 | **Claude** | `.claude/CLAUDE.md` | 强制覆盖 |
-| **Claude** | `.claude/skills/` | 保留目标已有文件，覆盖同名 skill |
+| **Claude** | `.claude/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
 | **Codex** | `.codex/config.toml` | 受管顶层域同步，保留目标非受管配置 |
 | **Codex** | `.codex/auth.json` | 强制覆盖 |
 | **Codex** | `.codex/AGENTS.md` | 强制覆盖 |
-| **Codex** | `.codex/skills/` | 保留目标已有文件，覆盖同名 skill |
+| **Codex** | `.codex/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 ## 📦 依赖要求
 
 ### 必需工具
@@ -256,11 +256,12 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   - 保留其他字段不变
 
 #### `.claude/skills/`
-- **策略**：保留目标已有文件，覆盖同名 skill
+- **策略**：保留目标已有文件，同名 skill 内按文件覆盖
 - **逻辑**：
   - 同步源 skills 目录下的顶层 skill 到目标
-  - 目标存在同名 skill → 删除后写入源侧 skill
+  - 目标存在同名 skill 目录 → 目录内同名文件覆盖，不同名文件保留
   - 目标存在其他 skill → 保留不变
+  - 同名 skill 出现文件/目录类型冲突 → 替换为源侧类型
   - 自动过滤系统文件和临时文件
 
 ### Codex 配置同步
@@ -274,11 +275,12 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   4. 目标配置中的非受管域保持不变，例如本地 `mcp_servers`
 
 #### `.codex/skills/`
-- **策略**：保留目标已有文件，覆盖同名 skill
+- **策略**：保留目标已有文件，同名 skill 内按文件覆盖
 - **逻辑**：
   - 同步源 skills 目录下的顶层 skill 到目标
-  - 目标存在同名 skill → 删除后写入源侧 skill
+  - 目标存在同名 skill 目录 → 目录内同名文件覆盖，不同名文件保留
   - 目标存在其他 skill → 保留不变
+  - 同名 skill 出现文件/目录类型冲突 → 替换为源侧类型
   - 自动过滤系统文件和临时文件
 
 ## 🛠️ 工作流程
@@ -297,14 +299,14 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 6. 🔄 同步 Claude 配置文件              ← claude.sh
    ├─ settings.json (智能合并)
    ├─ CLAUDE.md (强制覆盖)
-   ├─ skills/ (保留目标已有文件，覆盖同名 skill)
+   ├─ skills/ (保留目标已有文件，同名 skill 内按文件覆盖)
    └─ .claude.json (确保引导完成)
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
    ├─ config.toml (受管顶层域同步，保留非受管配置)
    ├─ auth.json (强制覆盖)
    ├─ AGENTS.md (强制覆盖)
-   └─ skills/ (保留目标已有文件，覆盖同名 skill)
+   └─ skills/ (保留目标已有文件，同名 skill 内按文件覆盖)
    ↓
 8. 📊 统一输出所有同步结果              ← output.sh
    ↓
@@ -329,7 +331,7 @@ target_dirs:
 会按配置类型采用不同策略：
 - **JSON 配置**：深度合并，保留目标路径的特定字段（如 `mcpServers`）
 - **Markdown 文件**：`.claude/CLAUDE.md` 和 `.codex/AGENTS.md` 会强制覆盖
-- **技能目录**：保留目标已有其他 skill，但源侧同名 skill 会覆盖目标侧同名 skill
+- **技能目录**：保留目标已有其他 skill，同名 skill 目录内只覆盖同名文件
 - **认证文件**：强制覆盖（确保认证信息一致）
 
 ### Q3: 如果目标路径不存在会怎样？
@@ -362,8 +364,9 @@ target_dirs:
 
 ### Q7: 技能目录会被覆盖吗？
 
-不会整体覆盖。技能目录使用"保留目标已有文件，覆盖同名 skill"策略：
-- 源侧存在同名 skill 时，覆盖目标侧同名 skill
+不会整体覆盖。技能目录使用"保留目标已有文件，同名 skill 内按文件覆盖"策略：
+- 源侧存在同名 skill 目录时，只覆盖目录内同名文件
+- 目标侧同名 skill 目录内的其他文件保留不变
 - 目标侧其他 skill 保留不变
 - 自动过滤系统文件和临时文件
 - 用户自定义 skill 只要不与源侧同名，就不会丢失

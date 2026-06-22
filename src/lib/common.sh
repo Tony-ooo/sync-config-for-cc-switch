@@ -157,6 +157,10 @@ copy_filtered_item() {
     local copy_failed=0
 
     if [ -d "$source_item" ] && [ ! -L "$source_item" ]; then
+        if { [ -e "$target_item" ] || [ -L "$target_item" ]; } && { [ ! -d "$target_item" ] || [ -L "$target_item" ]; }; then
+            rm -rf "$target_item" 2>/dev/null || return 1
+        fi
+
         if ! ensure_sync_dir "$target_item"; then
             return 1
         fi
@@ -171,11 +175,25 @@ copy_filtered_item() {
             target_child="$target_item/$relative_path"
 
             if [ -d "$child" ] && [ ! -L "$child" ]; then
+                if { [ -e "$target_child" ] || [ -L "$target_child" ]; } && { [ ! -d "$target_child" ] || [ -L "$target_child" ]; }; then
+                    if ! rm -rf "$target_child" 2>/dev/null; then
+                        copy_failed=1
+                        continue
+                    fi
+                fi
+
                 if ! ensure_sync_dir "$target_child"; then
                     copy_failed=1
                 fi
             elif [ -f "$child" ] || [ -L "$child" ]; then
                 target_parent="$(dirname "$target_child")"
+                if [ -d "$target_child" ] && [ ! -L "$target_child" ]; then
+                    if ! rm -rf "$target_child" 2>/dev/null; then
+                        copy_failed=1
+                        continue
+                    fi
+                fi
+
                 if ensure_sync_dir "$target_parent" && cp -f "$child" "$target_child"; then
                     :
                 else
@@ -187,10 +205,14 @@ copy_filtered_item() {
         return "$copy_failed"
     fi
 
+    if [ -d "$target_item" ] && [ ! -L "$target_item" ]; then
+        rm -rf "$target_item" 2>/dev/null || return 1
+    fi
+
     cp -f "$source_item" "$target_item"
 }
 
-# 复制 skills 目录（保留目标侧其他 skill，覆盖同名顶层 skill）
+# 复制 skills 目录（保留目标侧其他 skill，同名 skill 目录内按文件覆盖）
 # 参数:
 #   $1 = source_dir (源 skills 目录路径，相对于 SOURCE_DIR)
 #   $2 = target_dir (目标 skills 目录路径，绝对路径)
@@ -205,7 +227,8 @@ copy_skills_overwrite_same_name() {
     local skill_name
     local target_item
     local success_count=0
-    local overwrite_count=0
+    local merge_count=0
+    local replace_count=0
     local warning_count=0
 
     if [ -z "$source_dir" ] || [ -z "$target_dir" ]; then
@@ -221,7 +244,7 @@ copy_skills_overwrite_same_name() {
     fi
 
     if [ ! -d "$target_dir" ]; then
-        add_sync_result "$dir_type" "保留目标已有文件，覆盖同名 skill" "$target_root" "warning" "无法创建目标目录"
+        add_sync_result "$dir_type" "保留目标已有文件，同名 skill 内按文件覆盖" "$target_root" "warning" "无法创建目标目录"
         return 0
     fi
 
@@ -233,12 +256,25 @@ copy_skills_overwrite_same_name() {
 
         target_item="$target_dir/$skill_name"
 
-        if [ -e "$target_item" ] || [ -L "$target_item" ]; then
-            if rm -rf "$target_item" 2>/dev/null; then
-                overwrite_count=$((overwrite_count + 1))
+        if [ -d "$source_item" ] && [ ! -L "$source_item" ] && [ -d "$target_item" ] && [ ! -L "$target_item" ]; then
+            merge_count=$((merge_count + 1))
+        elif [ -e "$target_item" ] || [ -L "$target_item" ]; then
+            if [ -d "$source_item" ] && [ ! -L "$source_item" ]; then
+                if rm -rf "$target_item" 2>/dev/null; then
+                    replace_count=$((replace_count + 1))
+                else
+                    warning_count=$((warning_count + 1))
+                    continue
+                fi
+            elif [ -d "$target_item" ] && [ ! -L "$target_item" ]; then
+                if rm -rf "$target_item" 2>/dev/null; then
+                    replace_count=$((replace_count + 1))
+                else
+                    warning_count=$((warning_count + 1))
+                    continue
+                fi
             else
-                warning_count=$((warning_count + 1))
-                continue
+                merge_count=$((merge_count + 1))
             fi
         fi
 
@@ -261,11 +297,19 @@ copy_skills_overwrite_same_name() {
         detail="已同步 ${success_count} 个 skill"
     fi
 
-    if [ $overwrite_count -gt 0 ]; then
+    if [ $merge_count -gt 0 ]; then
         if [ -n "$detail" ]; then
-            detail="${detail}, 覆盖 ${overwrite_count} 个同名 skill"
+            detail="${detail}, 合并 ${merge_count} 个同名 skill"
         else
-            detail="覆盖 ${overwrite_count} 个同名 skill"
+            detail="合并 ${merge_count} 个同名 skill"
+        fi
+    fi
+
+    if [ $replace_count -gt 0 ]; then
+        if [ -n "$detail" ]; then
+            detail="${detail}, 替换 ${replace_count} 个类型冲突 skill"
+        else
+            detail="替换 ${replace_count} 个类型冲突 skill"
         fi
     fi
 
@@ -278,7 +322,7 @@ copy_skills_overwrite_same_name() {
         status="warning"
     fi
 
-    add_sync_result "$dir_type" "保留目标已有文件，覆盖同名 skill" "$target_root" "$status" "$detail"
+    add_sync_result "$dir_type" "保留目标已有文件，同名 skill 内按文件覆盖" "$target_root" "$status" "$detail"
 }
 
 # 安全备份文件

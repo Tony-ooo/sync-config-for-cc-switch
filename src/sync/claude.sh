@@ -113,7 +113,7 @@ copy_claude_files() {
         add_sync_result "CLAUDE.md" "强制覆盖" "" "error" "未找到源文件"
     fi
 
-    # 复制 skills 目录（保留目标侧其他 skill，覆盖同名 skill）
+    # 复制 skills 目录（保留目标侧其他 skill，同名 skill 内按文件覆盖）
     if [ -d ".claude/skills" ]; then
         for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
             copy_skills_overwrite_same_name ".claude/skills" "$target/.claude/skills" "$target" "claude-skills"
@@ -122,7 +122,7 @@ copy_claude_files() {
             copy_skills_overwrite_same_name ".claude/skills" "$target/skills" "$target" "claude-skills"
         done
     else
-        add_sync_result "claude-skills" "保留目标已有文件，覆盖同名 skill" "" "error" "未找到源目录"
+        add_sync_result "claude-skills" "保留目标已有文件，同名 skill 内按文件覆盖" "" "error" "未找到源目录"
     fi
 }
 
