@@ -269,7 +269,7 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 #### `.codex/config.toml`
 - **策略**：受管顶层域同步，保留目标非受管配置
 - **逻辑**：
-  1. 将以下顶层域视为受管域：`model_provider`、`model`、`model_reasoning_effort`、`approval_policy`、`sandbox_mode`、`suppress_unstable_features_warning`、`web_search`、`model_providers`、`features`、`analytics`、`feedback`、`notice`、`windows`
+  1. 将以下顶层域视为受管域：`model_provider`、`model`、`model_reasoning_effort`、`approval_policy`、`sandbox_mode`、`suppress_unstable_features_warning`、`web_search`、`personality`、`model_providers`、`features`、`analytics`、`feedback`、`notice`、`windows`、`memories`
   2. 目标配置中的受管域会先移除
   3. 源配置中存在的受管域会写入目标；源配置中删除的受管域也会从目标删除
   4. 目标配置中的非受管域保持不变，例如本地 `mcp_servers`

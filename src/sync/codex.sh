@@ -15,12 +15,14 @@ CODEX_CONFIG_MANAGED_ROOTS=(
     sandbox_mode
     suppress_unstable_features_warning
     web_search
+    personality
     model_providers
     features
     analytics
     feedback
     notice
     windows
+    memories
 )
 
 codex_config_managed_roots_csv() {
