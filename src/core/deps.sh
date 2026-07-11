@@ -4,8 +4,19 @@
 # 职责: 检测并安装 yq 和 jq 工具
 # 支持系统: Debian/Ubuntu, RHEL/CentOS/Fedora, macOS, Git Bash/MINGW/MSYS (Windows)
 
+# 非交互式 Git Bash 不会读取 ~/.bashrc，因此需主动加载脚本安装工具的目录。
+add_user_bin_to_path() {
+    local bin_dir="$HOME/.local/bin"
+
+    if [ -d "$bin_dir" ] && [[ ":$PATH:" != *":$bin_dir:"* ]]; then
+        export PATH="$bin_dir:$PATH"
+    fi
+}
+
 # yq 工具检测和自动安装函数
 check_and_install_yq() {
+    add_user_bin_to_path
+
     if command -v yq &> /dev/null; then
         return 0
     fi
@@ -87,6 +98,8 @@ check_and_install_yq() {
 
 # jq 工具检测和自动安装函数
 check_and_install_jq() {
+    add_user_bin_to_path
+
     if command -v jq &> /dev/null; then
         return 0
     fi
