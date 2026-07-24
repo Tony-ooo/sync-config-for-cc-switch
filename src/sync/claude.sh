@@ -129,7 +129,7 @@ copy_claude_files() {
 # 同步目标侧 .claude.json 到"已完成引导"状态
 # 逻辑:
 #   - 目标不存在 -> 创建 .claude.json，写入 {"hasCompletedOnboarding": true}
-#   - 目标存在 -> 仅覆盖/添加字段 hasCompletedOnboarding=true，保留其他字段不变
+#   - 目标存在 -> 在原文件内覆盖/添加字段 hasCompletedOnboarding=true，保留其他字段不变
 #   - 目标为空文件/仅空白 -> 覆盖为最小合法 JSON
 #   - 目标为非合法 JSON -> 先备份，再覆盖为最小合法 JSON（避免静默破坏）
 sync_claude_json_file() {
@@ -174,13 +174,14 @@ sync_claude_json_file() {
         return 0
     fi
 
-    # 情况 3: 合法 JSON -> 仅更新字段
+    # 情况 3: 合法 JSON -> 生成更新内容后写回原文件，保留原文件对象
     temp_file="${target_file}.tmp.$$"
     local jq_target=$(convert_path_for_windows "$target_file")
     local jq_temp=$(convert_path_for_windows "$temp_file")
 
     if jq '.hasCompletedOnboarding = true' "$jq_target" > "$jq_temp" 2>/dev/null; then
-        if mv -f "$temp_file" "$target_file"; then
+        if cat "$temp_file" > "$target_file"; then
+            rm -f "$temp_file" 2>/dev/null || true
             add_sync_result ".claude.json" "确保 hasCompletedOnboarding=true" "$target_root" "success"
         else
             rm -f "$temp_file" 2>/dev/null || true
