@@ -4,11 +4,9 @@
 # 职责: Claude 配置同步
 # 依赖: common.sh, output.sh, jq
 
-# 同步 .claude/settings.json（智能合并，仅更新源侧字段，保留目标侧其他字段）
-# 逻辑:
-#   - 目标不存在/为空 -> 写入源配置
-#   - 目标存在且为合法 JSON -> 深度合并（目标 * 源），保留目标所有字段
-#   - 目标为非合法 JSON -> 先备份，再写入源配置
+# 同步 .claude/settings.json（受管顶层域同步，保留目标非受管配置）
+# 受管字段由源配置决定：源中缺失的受管字段会从目标删除。
+# 目标非法 JSON 时先备份，再回退为源配置；源非法 JSON 时不修改目标。
 sync_claude_settings_json_file() {
     local source_file="$1"
     local target_file="$2"
@@ -16,6 +14,8 @@ sync_claude_settings_json_file() {
     local content
     local tmp_file
     local backup_file
+    local strategy="受管顶层域同步，保留目标非受管配置"
+    local managed_fields='["env","attribution","permissions","language","alwaysThinkingEnabled","skipDangerousModePermissionPrompt"]'
 
     if [ -z "$source_file" ] || [ -z "$target_file" ]; then
         return 0
@@ -25,8 +25,14 @@ sync_claude_settings_json_file() {
         return 0
     fi
 
+    # 源配置必须是合法 JSON 对象，避免非法源配置扩散到所有目标。
+    if ! jq -e 'type == "object"' "$(convert_path_for_windows "$source_file")" >/dev/null 2>&1; then
+        add_sync_result "settings.json" "$strategy" "$target_root" "error" "源文件不是合法JSON对象"
+        return 0
+    fi
+
     if [ -d "$target_file" ]; then
-        add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "目标是目录"
+        add_sync_result "settings.json" "$strategy" "$target_root" "warning" "目标是目录"
         return 0
     fi
 
@@ -35,61 +41,68 @@ sync_claude_settings_json_file() {
     # 情况 1: 目标不存在 -> 直接复制源文件
     if [ ! -e "$target_file" ]; then
         if cp -f "$source_file" "$target_file"; then
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "success"
+            add_sync_result "settings.json" "$strategy" "$target_root" "success"
         else
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "无法创建"
+            add_sync_result "settings.json" "$strategy" "$target_root" "warning" "无法创建"
         fi
         return 0
     fi
 
     # 读取文件并去除所有空白字符，用于识别空文件/仅空白
     if ! content=$(tr -d '[:space:]' < "$target_file" 2>/dev/null); then
-        add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "无法读取"
+        add_sync_result "settings.json" "$strategy" "$target_root" "warning" "无法读取"
         return 0
     fi
 
     # 情况 2: 空文件/仅空白 -> 覆盖为源配置
     if [ -z "$content" ]; then
         if cp -f "$source_file" "$target_file"; then
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "success"
+            add_sync_result "settings.json" "$strategy" "$target_root" "success"
         else
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "无法写入"
+            add_sync_result "settings.json" "$strategy" "$target_root" "warning" "无法写入"
         fi
         return 0
     fi
 
-    # 情况 3: 合法 JSON -> 顶层字段合并（目标 + 源，源字段整体替换，保留目标独有字段）
+    # 情况 3: 合法 JSON 对象 -> 仅同步受管顶层字段，保留目标非受管字段
     local jq_source=$(convert_path_for_windows "$source_file")
     local jq_target=$(convert_path_for_windows "$target_file")
     local jq_tmp=$(convert_path_for_windows "$tmp_file")
 
-    if jq -s '.[1] + .[0]' "$jq_source" "$jq_target" > "$jq_tmp" 2>/dev/null; then
+    if jq -s --argjson managed "$managed_fields" \
+        '.[0] as $source |
+         .[1] as $target |
+         if ($target | type) != "object" then error("target is not an object")
+         else
+           ($target | with_entries(select(.key as $key | ($managed | index($key)) == null)))
+           + ($source | with_entries(select(.key as $key | ($managed | index($key)) != null)))
+         end' "$jq_source" "$jq_target" > "$jq_tmp" 2>/dev/null; then
         if mv -f "$tmp_file" "$target_file"; then
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "success"
+            add_sync_result "settings.json" "$strategy" "$target_root" "success"
         else
             rm -f "$tmp_file" 2>/dev/null || true
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "写入失败"
+            add_sync_result "settings.json" "$strategy" "$target_root" "warning" "写入失败"
         fi
         return 0
     fi
 
-    # 情况 4: 非合法 JSON -> 备份后写入源配置
+    # 情况 4: 目标非合法 JSON -> 备份后写入源配置
     rm -f "$tmp_file" 2>/dev/null || true
     backup_file=$(safe_backup "$target_file")
     if [ -n "$backup_file" ]; then
         if cp -f "$source_file" "$target_file"; then
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "非合法JSON已备份"
+            add_sync_result "settings.json" "$strategy" "$target_root" "warning" "目标非合法JSON已备份"
         else
-            add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "无法写入"
+            add_sync_result "settings.json" "$strategy" "$target_root" "warning" "无法写入"
         fi
     else
-        add_sync_result "settings.json" "智能合并，保留目标字段" "$target_root" "warning" "备份失败"
+        add_sync_result "settings.json" "$strategy" "$target_root" "warning" "备份失败"
     fi
 }
 
 # 复制 .claude 目录文件: settings.json, CLAUDE.md
 copy_claude_files() {
-    # 同步 settings.json（智能合并，保留目标侧字段）
+    # 同步 settings.json（受管顶层域同步，保留目标非受管配置）
     if [ -f ".claude/settings.json" ]; then
         for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
             sync_claude_settings_json_file ".claude/settings.json" "$target/.claude/settings.json" "$target"
@@ -98,7 +111,7 @@ copy_claude_files() {
             sync_claude_settings_json_file ".claude/settings.json" "$target/settings.json" "$target"
         done
     else
-        add_sync_result "settings.json" "智能合并，保留目标字段" "" "error" "未找到源文件"
+        add_sync_result "settings.json" "受管顶层域同步，保留目标非受管配置" "" "error" "未找到源文件"
     fi
 
     # 复制 CLAUDE.md（强制覆盖）

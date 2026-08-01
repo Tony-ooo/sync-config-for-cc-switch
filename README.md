@@ -32,7 +32,7 @@
 
 | 工具 | 配置文件 | 同步策略 |
 |------|---------|---------|
-| **Claude** | `.claude/settings.json` | 智能合并，保留目标字段 |
+| **Claude** | `.claude/settings.json` | 受管顶层域同步，保留目标非受管配置 |
 | **Claude** | `.claude/CLAUDE.md` | 强制覆盖 |
 | **Claude** | `.claude/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
@@ -156,7 +156,7 @@ target_dirs:
 
 #### 同步模块 (src/sync/)
 
-- **claude.sh**: Claude 配置智能合并同步
+- **claude.sh**: Claude 配置受管顶层域同步
 - **codex.sh**: Codex 配置同步（受管顶层域同步）
 #### 工具模块 (src/utils/)
 
@@ -242,12 +242,15 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 ### Claude 配置同步
 
 #### `.claude/settings.json`
-- **策略**：智能合并
+- **策略**：受管顶层域同步，保留目标非受管配置
+- **受管顶层字段**：`env`、`attribution`、`permissions`、`language`、`alwaysThinkingEnabled`、`skipDangerousModePermissionPrompt`
 - **逻辑**：
   - 目标不存在 → 创建并写入源配置
   - 目标为空 → 覆盖为源配置
-  - 目标为合法 JSON → 使用 `jq` 深度合并 `目标 * 源`（保留目标所有字段）
-  - 目标为非法 JSON → 备份后写入源配置
+  - 源文件必须是合法 JSON 对象，否则跳过该目标并报错
+  - 目标为合法 JSON 对象 → 删除目标中的受管字段，再写入源配置中的受管字段；目标非受管字段保持不变
+  - 源配置中缺失的受管字段会从目标删除，确保受管域与源一致
+  - 目标为非法 JSON 或非对象 → 备份后写入源配置
 
 #### `.claude.json`
 - **策略**：确保引导完成
@@ -297,7 +300,7 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 5. 📁 准备必要目录                      ← directory.sh
    ↓
 6. 🔄 同步 Claude 配置文件              ← claude.sh
-   ├─ settings.json (智能合并)
+   ├─ settings.json (受管顶层域同步，保留目标非受管配置)
    ├─ CLAUDE.md (强制覆盖)
    ├─ skills/ (保留目标已有文件，同名 skill 内按文件覆盖)
    └─ .claude.json (确保引导完成)
@@ -329,7 +332,7 @@ target_dirs:
 ### Q2: 脚本会覆盖我的自定义配置吗？
 
 会按配置类型采用不同策略：
-- **JSON 配置**：深度合并，保留目标路径的特定字段（如 `mcpServers`）
+- **Claude settings.json**：仅同步受管顶层字段，保留目标非受管配置；源中缺失的受管字段会从目标删除
 - **Markdown 文件**：`.claude/CLAUDE.md` 和 `.codex/AGENTS.md` 会强制覆盖
 - **技能目录**：保留目标已有其他 skill，同名 skill 目录内只覆盖同名文件
 - **认证文件**：强制覆盖（确保认证信息一致）

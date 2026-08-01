@@ -39,7 +39,7 @@ get_target_index() {
 # 添加同步结果到全局数组
 # 参数:
 #   $1 = 文件类型 (如 "settings.json")
-#   $2 = 策略说明 (如 "智能合并，保留目标字段")
+#   $2 = 策略说明 (如 "受管顶层域同步，保留目标非受管配置")
 #   $3 = 目标路径
 #   $4 = 状态 (success/skip/warning/error)
 #   $5 = 详细信息 (可选)
@@ -83,8 +83,8 @@ print_sync_section() {
             IFS='|' read -r f_type f_strategy f_target f_status f_detail <<< "$result"
 
             if [ "$f_type" = "$file" ]; then
-                # 对于 settings.json，Claude 部分只处理策略说明为 "智能合并，保留目标字段" 的结果
-                if [ "$file" = "settings.json" ] && [ "$section_name" = "Claude" ] && [ "$f_strategy" != "智能合并，保留目标字段" ]; then
+                # 对于 settings.json，Claude 部分只处理该文件自身的同步结果
+                if [ "$file" = "settings.json" ] && [ "$section_name" = "Claude" ] && [ "$f_strategy" != "受管顶层域同步，保留目标非受管配置" ]; then
                     continue
                 fi
 
