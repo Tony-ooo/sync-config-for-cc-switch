@@ -11,6 +11,10 @@ CODEX_CONFIG_MANAGED_ROOTS=(
     model_provider
     model
     model_reasoning_effort
+    plan_mode_reasoning_effort
+    model_reasoning_summary
+    model_context_window
+    model_auto_compact_token_limit
     approval_policy
     sandbox_mode
     suppress_unstable_features_warning
