@@ -108,8 +108,7 @@ print_sync_section() {
                     if [ -z "$skip_reason" ] && [ -n "$f_detail" ]; then
                         skip_reason="$f_detail"
                     fi
-                    # 对于 skills 类型，也显示 skip 状态
-                    if [[ "$file" =~ -skills$ ]] && [ "$f_target" != "-1" ] && [ -n "$f_detail" ]; then
+                    if [ "$f_target" != "-1" ] && [ -n "$f_detail" ]; then
                         file_results+=("  - 目标路径${f_target}: $f_detail")
                         has_output=1
                     fi

@@ -2,7 +2,7 @@
 
 # ==================== Codex 配置同步模块 ====================
 # 职责: Codex 配置同步
-# 依赖: common.sh, output.sh, awk
+# 依赖: common.sh, output.sh, awk, jq
 
 # Codex config.toml 受管顶层域:
 # - 这些域以源配置为准，源里删除后目标也会删除
@@ -223,6 +223,43 @@ sync_codex_config_toml() {
     rm -f "$tmp_file" "$target_unmanaged_root" "$target_unmanaged_tables" "$source_managed_root" "$source_managed_tables" 2>/dev/null || true
 }
 
+# 同步 .codex/auth.json
+# 目标文件存在且顶层 auth_mode 为 chatgpt 时跳过，其余情况强制覆盖。
+sync_codex_auth_json() {
+    local source_file="$1"
+    local target_file="$2"
+    local target_root="$3"
+    local strategy="目标 auth_mode=chatgpt 时跳过，其余强制覆盖"
+    local jq_target
+
+    if [ -z "$source_file" ] || [ -z "$target_file" ]; then
+        return 0
+    fi
+
+    if [ ! -f "$source_file" ]; then
+        return 0
+    fi
+
+    if [ -d "$target_file" ]; then
+        add_sync_result "auth.json" "$strategy" "$target_root" "warning" "目标是目录"
+        return 0
+    fi
+
+    if [ -f "$target_file" ]; then
+        jq_target="$(convert_path_for_windows "$target_file")"
+        if jq -e '.auth_mode == "chatgpt"' "$jq_target" >/dev/null 2>&1; then
+            add_sync_result "auth.json" "$strategy" "$target_root" "skip" "目标 auth_mode 为 chatgpt"
+            return 0
+        fi
+    fi
+
+    if cp -f "$source_file" "$target_file"; then
+        add_sync_result "auth.json" "$strategy" "$target_root" "success"
+    else
+        add_sync_result "auth.json" "$strategy" "$target_root" "warning" "无法写入"
+    fi
+}
+
 # 复制 .codex 目录文件: AGENTS.md, auth.json, config.toml
 copy_codex_files() {
     # 复制 AGENTS.md（强制覆盖）
@@ -237,16 +274,16 @@ copy_codex_files() {
         add_sync_result "AGENTS.md" "强制覆盖" "" "error" "未找到源文件"
     fi
 
-    # 复制 auth.json
+    # 复制 auth.json（目标 auth_mode=chatgpt 时跳过，其余强制覆盖）
     if [ -f ".codex/auth.json" ]; then
         for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do
-            copy_and_force_overwrite ".codex/auth.json" "$target/.codex/auth.json" "$target" "auth.json"
+            sync_codex_auth_json ".codex/auth.json" "$target/.codex/auth.json" "$target"
         done
         for target in "${VALID_CODEX_DIRECT_DIRS[@]}"; do
-            copy_and_force_overwrite ".codex/auth.json" "$target/auth.json" "$target" "auth.json"
+            sync_codex_auth_json ".codex/auth.json" "$target/auth.json" "$target"
         done
     else
-        add_sync_result "auth.json" "强制覆盖" "" "error" "未找到源文件"
+        add_sync_result "auth.json" "目标 auth_mode=chatgpt 时跳过，其余强制覆盖" "" "error" "未找到源文件"
     fi
 
     # 复制 config.toml (受管顶层域以源为准,目标非受管配置保留)

@@ -37,7 +37,7 @@
 | **Claude** | `.claude/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
 | **Codex** | `.codex/config.toml` | 受管顶层域同步，保留目标非受管配置 |
-| **Codex** | `.codex/auth.json` | 强制覆盖 |
+| **Codex** | `.codex/auth.json` | 目标 `auth_mode=chatgpt` 时跳过，其余强制覆盖 |
 | **Codex** | `.codex/AGENTS.md` | 强制覆盖 |
 | **Codex** | `.codex/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 ## 📦 依赖要求
@@ -269,6 +269,13 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 
 ### Codex 配置同步
 
+#### `.codex/auth.json`
+- **策略**：目标 `auth_mode=chatgpt` 时跳过，其余强制覆盖
+- **逻辑**：
+  - 目标文件存在，且顶层字段 `"auth_mode": "chatgpt"` → 跳过，不修改目标
+  - 目标不存在、字段缺失、或 `auth_mode` 为其他值 → `cp -f` 强制覆盖
+  - 目标不是合法 JSON 时视为不满足跳过条件，强制覆盖
+
 #### `.codex/config.toml`
 - **策略**：受管顶层域同步，保留目标非受管配置
 - **逻辑**：
@@ -307,7 +314,7 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
    ├─ config.toml (受管顶层域同步，保留非受管配置)
-   ├─ auth.json (强制覆盖)
+   ├─ auth.json (目标 auth_mode=chatgpt 时跳过，其余强制覆盖)
    ├─ AGENTS.md (强制覆盖)
    └─ skills/ (保留目标已有文件，同名 skill 内按文件覆盖)
    ↓
@@ -335,7 +342,7 @@ target_dirs:
 - **Claude settings.json**：仅同步受管顶层字段，保留目标非受管配置；源中缺失的受管字段会从目标删除
 - **Markdown 文件**：`.claude/CLAUDE.md` 和 `.codex/AGENTS.md` 会强制覆盖
 - **技能目录**：保留目标已有其他 skill，同名 skill 目录内只覆盖同名文件
-- **认证文件**：强制覆盖（确保认证信息一致）
+- **认证文件**：Codex `auth.json` 在目标已是 ChatGPT 认证（`auth_mode=chatgpt`）时跳过，其余情况强制覆盖
 
 ### Q3: 如果目标路径不存在会怎样？
 
