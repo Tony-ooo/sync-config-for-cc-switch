@@ -243,7 +243,7 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 
 #### `.claude/settings.json`
 - **策略**：受管顶层域同步，保留目标非受管配置
-- **受管顶层字段**：`env`、`attribution`、`permissions`、`language`、`alwaysThinkingEnabled`、`skipDangerousModePermissionPrompt`
+- **受管顶层字段**：`env`、`attribution`、`permissions`、`language`、`alwaysThinkingEnabled`、`skipDangerousModePermissionPrompt`、`tui`
 - **逻辑**：
   - 目标不存在 → 创建并写入源配置
   - 目标为空 → 覆盖为源配置

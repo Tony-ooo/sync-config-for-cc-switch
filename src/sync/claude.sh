@@ -15,7 +15,7 @@ sync_claude_settings_json_file() {
     local tmp_file
     local backup_file
     local strategy="受管顶层域同步，保留目标非受管配置"
-    local managed_fields='["env","attribution","permissions","language","alwaysThinkingEnabled","skipDangerousModePermissionPrompt"]'
+    local managed_fields='["env","attribution","permissions","language","alwaysThinkingEnabled","skipDangerousModePermissionPrompt","tui"]'
 
     if [ -z "$source_file" ] || [ -z "$target_file" ]; then
         return 0
