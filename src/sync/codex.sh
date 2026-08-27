@@ -29,6 +29,156 @@ CODEX_CONFIG_MANAGED_ROOTS=(
     memories
 )
 
+# 提取当前激活的 model_provider (若未设置或为官方 openai 则返回相应值)
+extract_codex_active_model_provider() {
+    local config_file="$1"
+    if [ ! -f "$config_file" ]; then
+        return 0
+    fi
+    awk -F'=' '
+        /^[[:space:]]*model_provider[[:space:]]*=/ {
+            val = $2
+            sub(/^[[:space:]]+/, "", val)
+            sub(/[[:space:]]+(#.*)?$/, "", val)
+            gsub(/^"|"$/, "", val)
+            gsub(/^'\''|'\''$/, "", val)
+            print val
+            exit
+        }
+    ' "$config_file"
+}
+
+# 提取源端 Token: 优先从 auth.json 提取 OPENAI_API_KEY，兜底从 config.toml 提取
+extract_codex_source_token() {
+    local source_auth_file="$1"
+    local source_config_file="$2"
+    local active_provider="$3"
+    local token=""
+
+    if [ -f "$source_auth_file" ]; then
+        local jq_auth
+        jq_auth="$(convert_path_for_windows "$source_auth_file")"
+        token="$(jq -r '.OPENAI_API_KEY // empty' "$jq_auth" 2>/dev/null)"
+    fi
+
+    if [ -n "$token" ]; then
+        echo "$token"
+        return 0
+    fi
+
+    if [ -f "$source_config_file" ]; then
+        token=$(awk -v provider="$active_provider" '
+            BEGIN { in_target_table = 0; table_token = ""; top_token = "" }
+            /^[[:space:]]*\[/ {
+                header = $0
+                sub(/^[[:space:]]*\[\[?[[:space:]]*/, "", header)
+                sub(/[[:space:]]*\]\]?[[:space:]]*($|#.*$)/, "", header)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", header)
+                if (header == "model_providers." provider || header == "model_providers.\"" provider "\"") {
+                    in_target_table = 1
+                } else {
+                    in_target_table = 0
+                }
+            }
+            /^[[:space:]]*experimental_bearer_token[[:space:]]*=/ {
+                val = $0
+                sub(/^[[:space:]]*experimental_bearer_token[[:space:]]*=[[:space:]]*/, "", val)
+                sub(/[[:space:]]*(#.*)?$/, "", val)
+                gsub(/^"|"$/, "", val)
+                gsub(/^'\''|'\''$/, "", val)
+                if (in_target_table) {
+                    table_token = val
+                } else if (!top_token) {
+                    top_token = val
+                }
+            }
+            END {
+                if (table_token != "") print table_token
+                else if (top_token != "") print top_token
+            }
+        ' "$source_config_file")
+    fi
+
+    echo "$token"
+}
+
+# 在 config.toml 的 [model_providers.<active_provider>] 中注入/更新 experimental_bearer_token
+inject_codex_experimental_bearer_token() {
+    local input_file="$1"
+    local output_file="$2"
+    local active_provider="$3"
+    local token="$4"
+
+    if [ -z "$active_provider" ] || [ "$active_provider" = "openai" ] || [ -z "$token" ]; then
+        cp -f "$input_file" "$output_file"
+        return 0
+    fi
+
+    awk -v provider="$active_provider" -v token="$token" '
+        BEGIN {
+            in_target_table = 0
+            table_found = 0
+            token_inserted = 0
+            # 格式化转义双引号和反斜杠
+            gsub(/\\/, "\\\\", token)
+            gsub(/"/, "\\\"", token)
+        }
+
+        function is_table_header(line) {
+            return line ~ /^[[:space:]]*\[\[?[[:space:]]*[^]]+[[:space:]]*\]\]?[[:space:]]*($|#)/
+        }
+
+        function get_table_name(line, value) {
+            value = line
+            sub(/^[[:space:]]*\[\[?[[:space:]]*/, "", value)
+            sub(/[[:space:]]*\]\]?[[:space:]]*($|#.*$)/, "", value)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+
+        {
+            if (is_table_header($0)) {
+                tname = get_table_name($0)
+                if (in_target_table && !token_inserted) {
+                    print "experimental_bearer_token = \"" token "\""
+                    token_inserted = 1
+                }
+
+                if (tname == "model_providers." provider || tname == "model_providers.\"" provider "\"") {
+                    in_target_table = 1
+                    table_found = 1
+                } else {
+                    in_target_table = 0
+                }
+
+                print $0
+                next
+            }
+
+            if (in_target_table) {
+                if ($0 ~ /^[[:space:]]*experimental_bearer_token[[:space:]]*=/) {
+                    print "experimental_bearer_token = \"" token "\""
+                    token_inserted = 1
+                    next
+                }
+            }
+
+            print $0
+        }
+
+        END {
+            if (in_target_table && !token_inserted) {
+                print "experimental_bearer_token = \"" token "\""
+                token_inserted = 1
+            } else if (!table_found && provider != "" && token != "") {
+                print ""
+                print "[model_providers." provider "]"
+                print "experimental_bearer_token = \"" token "\""
+            }
+        }
+    ' "$input_file" > "$output_file"
+}
+
 codex_config_managed_roots_csv() {
     local IFS=,
     echo "${CODEX_CONFIG_MANAGED_ROOTS[*]}"
@@ -214,13 +364,23 @@ sync_codex_config_toml() {
     append_codex_config_part "$tmp_file" "$source_managed_tables"
     append_codex_config_part "$tmp_file" "$target_unmanaged_tables"
 
+    # 若为第三方供应商且存在 Token，动态注入/同步 experimental_bearer_token
+    local active_provider
+    local token
+    local injected_tmp_file="${target_file}.injected.$$"
+    active_provider="$(extract_codex_active_model_provider "$source_file")"
+    token="$(extract_codex_source_token ".codex/auth.json" "$source_file" "$active_provider")"
+
+    inject_codex_experimental_bearer_token "$tmp_file" "$injected_tmp_file" "$active_provider" "$token"
+    mv -f "$injected_tmp_file" "$tmp_file" 2>/dev/null || true
+
     if mv -f "$tmp_file" "$target_file"; then
         add_sync_result "config.toml" "$strategy" "$target_root" "success"
     else
         add_sync_result "config.toml" "$strategy" "$target_root" "warning" "写入失败"
     fi
 
-    rm -f "$tmp_file" "$target_unmanaged_root" "$target_unmanaged_tables" "$source_managed_root" "$source_managed_tables" 2>/dev/null || true
+    rm -f "$tmp_file" "$injected_tmp_file" "$target_unmanaged_root" "$target_unmanaged_tables" "$source_managed_root" "$source_managed_tables" 2>/dev/null || true
 }
 
 # 同步 .codex/auth.json
