@@ -119,6 +119,7 @@ inject_codex_experimental_bearer_token() {
             in_target_table = 0
             table_found = 0
             token_inserted = 0
+            pending_blank = ""
             # 格式化转义双引号和反斜杠
             gsub(/\\/, "\\\\", token)
             gsub(/"/, "\\\"", token)
@@ -139,9 +140,16 @@ inject_codex_experimental_bearer_token() {
         {
             if (is_table_header($0)) {
                 tname = get_table_name($0)
-                if (in_target_table && !token_inserted) {
-                    print "experimental_bearer_token = \"" token "\""
-                    token_inserted = 1
+                if (in_target_table) {
+                    if (!token_inserted) {
+                        print "experimental_bearer_token = \"" token "\""
+                        token_inserted = 1
+                    }
+                    print ""
+                    pending_blank = ""
+                } else if (pending_blank != "") {
+                    printf "%s", pending_blank
+                    pending_blank = ""
                 }
 
                 if (tname == "model_providers." provider || tname == "model_providers.\"" provider "\"") {
@@ -156,24 +164,45 @@ inject_codex_experimental_bearer_token() {
             }
 
             if (in_target_table) {
+                if ($0 ~ /^[[:space:]]*$/) {
+                    pending_blank = pending_blank $0 "\n"
+                    next
+                }
+
+                if (pending_blank != "") {
+                    printf "%s", pending_blank
+                    pending_blank = ""
+                }
+
                 if ($0 ~ /^[[:space:]]*experimental_bearer_token[[:space:]]*=/) {
                     print "experimental_bearer_token = \"" token "\""
                     token_inserted = 1
                     next
                 }
+
+                print $0
+                next
             }
 
+            if (pending_blank != "") {
+                printf "%s", pending_blank
+                pending_blank = ""
+            }
             print $0
         }
 
         END {
-            if (in_target_table && !token_inserted) {
-                print "experimental_bearer_token = \"" token "\""
-                token_inserted = 1
+            if (in_target_table) {
+                if (!token_inserted) {
+                    print "experimental_bearer_token = \"" token "\""
+                    token_inserted = 1
+                }
             } else if (!table_found && provider != "" && token != "") {
                 print ""
                 print "[model_providers." provider "]"
                 print "experimental_bearer_token = \"" token "\""
+            } else if (pending_blank != "") {
+                printf "%s", pending_blank
             }
         }
     ' "$input_file" > "$output_file"
