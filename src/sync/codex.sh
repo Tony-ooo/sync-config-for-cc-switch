@@ -208,6 +208,145 @@ inject_codex_experimental_bearer_token() {
     ' "$input_file" > "$output_file"
 }
 
+# 强制激活的第三方 provider 表的 requires_openai_auth 为 true（缺失时跳过）
+# 仅在同步过程中对"待写入目标"的临时文本生效，不修改源文件。
+# 参数:
+#   $1 = input_file  (待写入的临时文本)
+#   $2 = output_file (处理后的输出文件)
+#   $3 = active_provider (当前激活的 model_provider；为空或 openai 时原样复制)
+# 规则:
+#   - 只处理 [model_providers.<active_provider>] 表
+#   - 表中 requires_openai_auth 存在且为 false -> 替换为 true
+#   - 表中 requires_openai_auth 缺失 -> 跳过，不新增
+enforce_codex_requires_openai_auth() {
+    local input_file="$1"
+    local output_file="$2"
+    local active_provider="$3"
+
+    if [ -z "$active_provider" ] || [ "$active_provider" = "openai" ]; then
+        cp -f "$input_file" "$output_file"
+        return 0
+    fi
+
+    awk -v provider="$active_provider" '
+        BEGIN {
+            in_target_table = 0
+            table_found = 0
+        }
+
+        function is_table_header(line) {
+            return line ~ /^[[:space:]]*\[\[?[[:space:]]*[^]]+[[:space:]]*\]\]?[[:space:]]*($|#)/
+        }
+
+        function get_table_name(line, value) {
+            value = line
+            sub(/^[[:space:]]*\[\[?[[:space:]]*/, "", value)
+            sub(/[[:space:]]*\]\]?[[:space:]]*($|#.*$)/, "", value)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+
+        {
+            if (is_table_header($0)) {
+                tname = get_table_name($0)
+                if (tname == "model_providers." provider || tname == "model_providers.\"" provider "\"") {
+                    in_target_table = 1
+                    table_found = 1
+                } else {
+                    in_target_table = 0
+                }
+                print $0
+                next
+            }
+
+            if (in_target_table && $0 ~ /^[[:space:]]*requires_openai_auth[[:space:]]*=/) {
+                # 解析当前值
+                val = $0
+                sub(/^[[:space:]]*requires_openai_auth[[:space:]]*=[[:space:]]*/, "", val)
+                sub(/[[:space:]]*(#.*)?$/, "", val)
+                gsub(/^"|"$/, "", val)
+                gsub(/^'\''|'\''$/, "", val)
+                if (val != "true") {
+                    print "requires_openai_auth = true"
+                    next
+                }
+            }
+
+            print $0
+        }
+    ' "$input_file" > "$output_file"
+}
+
+# 同步完成后校验目标端：激活的第三方 provider 表的 requires_openai_auth 必须为 true
+# 参数:
+#   $1 = config_file (目标 config.toml)
+#   $2 = active_provider (当前激活的 model_provider)
+# 返回: 0 = 校验通过（无需修复或已修复）；1 = 校验失败
+verify_codex_requires_openai_auth() {
+    local config_file="$1"
+    local active_provider="$2"
+
+    if [ -z "$active_provider" ] || [ "$active_provider" = "openai" ] || [ ! -f "$config_file" ]; then
+        return 0
+    fi
+
+    local current_value
+    current_value=$(awk -v provider="$active_provider" '
+        BEGIN { in_target_table = 0; found = 0; value = "" }
+        function is_table_header(line) {
+            return line ~ /^[[:space:]]*\[\[?[[:space:]]*[^]]+[[:space:]]*\]\]?[[:space:]]*($|#)/
+        }
+        function get_table_name(line, v) {
+            v = line
+            sub(/^[[:space:]]*\[\[?[[:space:]]*/, "", v)
+            sub(/[[:space:]]*\]\]?[[:space:]]*($|#.*$)/, "", v)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            return v
+        }
+        {
+            if (is_table_header($0)) {
+                tname = get_table_name($0)
+                if (tname == "model_providers." provider || tname == "model_providers.\"" provider "\"") {
+                    in_target_table = 1
+                } else {
+                    in_target_table = 0
+                }
+                next
+            }
+            if (in_target_table && $0 ~ /^[[:space:]]*requires_openai_auth[[:space:]]*=/) {
+                v = $0
+                sub(/^[[:space:]]*requires_openai_auth[[:space:]]*=[[:space:]]*/, "", v)
+                sub(/[[:space:]]*(#.*)?$/, "", v)
+                gsub(/^"|"$/, "", v)
+                gsub(/^'\''|'\''$/, "", v)
+                value = v
+                found = 1
+                exit
+            }
+        }
+        END { if (found) print value }
+    ' "$config_file")
+
+    if [ -z "$current_value" ]; then
+        # requires_openai_auth 缺失 -> 按约定跳过
+        return 0
+    fi
+
+    if [ "$current_value" != "true" ]; then
+        # 目标端被改为 false -> 强制修复为 true
+        local tmp_file="${config_file}.fix.$$"
+        if enforce_codex_requires_openai_auth "$config_file" "$tmp_file" "$active_provider"; then
+            if mv -f "$tmp_file" "$config_file" 2>/dev/null; then
+                return 0
+            fi
+        fi
+        rm -f "$tmp_file" 2>/dev/null || true
+        return 1
+    fi
+
+    return 0
+}
+
 codex_config_managed_roots_csv() {
     local IFS=,
     echo "${CODEX_CONFIG_MANAGED_ROOTS[*]}"
@@ -403,13 +542,24 @@ sync_codex_config_toml() {
     inject_codex_experimental_bearer_token "$tmp_file" "$injected_tmp_file" "$active_provider" "$token"
     mv -f "$injected_tmp_file" "$tmp_file" 2>/dev/null || true
 
+    # 同步过程中动态注入: 激活的第三方 provider 表 requires_openai_auth 强制为 true
+    # (仅作用于待写入文本，不修改源文件)
+    local enforced_tmp_file="${target_file}.enforced.$$"
+    enforce_codex_requires_openai_auth "$tmp_file" "$enforced_tmp_file" "$active_provider"
+    mv -f "$enforced_tmp_file" "$tmp_file" 2>/dev/null || true
+
     if mv -f "$tmp_file" "$target_file"; then
         add_sync_result "config.toml" "$strategy" "$target_root" "success"
     else
         add_sync_result "config.toml" "$strategy" "$target_root" "warning" "写入失败"
     fi
 
-    rm -f "$tmp_file" "$injected_tmp_file" "$target_unmanaged_root" "$target_unmanaged_tables" "$source_managed_root" "$source_managed_tables" 2>/dev/null || true
+    # 同步后校验目标端: requires_openai_auth 被外部改为 false 时强制修复为 true
+    if ! verify_codex_requires_openai_auth "$target_file" "$active_provider"; then
+        add_sync_result "config.toml" "$strategy" "$target_root" "warning" "requires_openai_auth 校验修复失败"
+    fi
+
+    rm -f "$tmp_file" "$injected_tmp_file" "$enforced_tmp_file" "$target_unmanaged_root" "$target_unmanaged_tables" "$source_managed_root" "$source_managed_tables" 2>/dev/null || true
 }
 
 # 同步 .codex/auth.json
