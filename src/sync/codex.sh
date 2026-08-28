@@ -27,6 +27,7 @@ CODEX_CONFIG_MANAGED_ROOTS=(
     notice
     windows
     memories
+    disable_response_storage
 )
 
 # 提取当前激活的 model_provider (若未设置或为官方 openai 则返回相应值)
