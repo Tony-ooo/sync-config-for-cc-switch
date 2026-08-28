@@ -283,6 +283,7 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   2. 目标配置中的受管域会先移除
   3. 源配置中存在的受管域会写入目标；源配置中删除的受管域也会从目标删除
   4. 目标配置中的非受管域保持不变，例如本地 `mcp_servers`
+- **`requires_openai_auth` 强制保护**：切换 Codex 供应商时，cc-switch 可能将激活的第三方 provider 表的 `requires_openai_auth` 强制改为 `false`。本工具在同步过程中会将该字段动态注入为 `true`（仅作用于写入目标的文本，**不修改源文件**），并在写入后再次校验目标端——若被外部改回 `false` 则自动修复为 `true`。约定：仅处理激活的第三方 provider 表；`requires_openai_auth` 缺失时跳过不新增；官方 `openai` provider 不处理。
 
 #### `.codex/skills/`
 - **策略**：保留目标已有文件，同名 skill 内按文件覆盖
