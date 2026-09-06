@@ -25,7 +25,6 @@
 - ✅ **路径验证**：自动检查目标路径的存在性和可写性
 - ✅ **自动备份**：非法 JSON 或格式错误时自动备份原文件
 - ✅ **位置独立**：可在任意路径运行，不依赖脚本所在目录
-- ✅ **技能模块管理**：支持同步 AI 编程助手的技能模块（代码审查、文档处理、UI/UX 设计等）
 - ✅ **跨平台支持**：支持 Linux、macOS、Windows (Git Bash)、WSL
 
 ### 支持的配置文件
@@ -34,12 +33,10 @@
 |------|---------|---------|
 | **Claude** | `.claude/settings.json` | 受管顶层域同步，保留目标非受管配置 |
 | **Claude** | `.claude/CLAUDE.md` | 强制覆盖 |
-| **Claude** | `.claude/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
 | **Codex** | `.codex/config.toml` | 受管顶层域同步，保留目标非受管配置 |
 | **Codex** | `.codex/auth.json` | 目标 `auth_mode=chatgpt` 时跳过，其余强制覆盖 |
 | **Codex** | `.codex/AGENTS.md` | 强制覆盖 |
-| **Codex** | `.codex/skills/` | 保留目标已有文件，同名 skill 内按文件覆盖 |
 ## 📦 依赖要求
 
 ### 必需工具
@@ -65,7 +62,6 @@
 sync-config-for-cc-switch/
 ├── sync_config.sh              # 主入口脚本
 ├── sync_config.yml             # 配置文件
-├── skills/                     # 技能模块目录
 └── src/                        # 源代码模块目录
     ├── core/                   # 核心功能模块
     │   ├── cli.sh             # 命令行参数处理
@@ -258,15 +254,6 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   - 设置或更新 `hasCompletedOnboarding: true`
   - 保留其他字段不变
 
-#### `.claude/skills/`
-- **策略**：保留目标已有文件，同名 skill 内按文件覆盖
-- **逻辑**：
-  - 同步源 skills 目录下的顶层 skill 到目标
-  - 目标存在同名 skill 目录 → 目录内同名文件覆盖，不同名文件保留
-  - 目标存在其他 skill → 保留不变
-  - 同名 skill 出现文件/目录类型冲突 → 替换为源侧类型
-  - 自动过滤系统文件和临时文件
-
 ### Codex 配置同步
 
 #### `.codex/auth.json`
@@ -285,15 +272,6 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
   4. 目标配置中的非受管域保持不变，例如本地 `mcp_servers`
 - **`requires_openai_auth` 强制保护**：切换 Codex 供应商时，cc-switch 可能将激活的第三方 provider 表的 `requires_openai_auth` 强制改为 `false`。本工具在同步过程中会将该字段动态注入为 `true`（仅作用于写入目标的文本，**不修改源文件**），并在写入后再次校验目标端——若被外部改回 `false` 则自动修复为 `true`。约定：仅处理激活的第三方 provider 表；`requires_openai_auth` 缺失时跳过不新增；官方 `openai` provider 不处理。
 
-#### `.codex/skills/`
-- **策略**：保留目标已有文件，同名 skill 内按文件覆盖
-- **逻辑**：
-  - 同步源 skills 目录下的顶层 skill 到目标
-  - 目标存在同名 skill 目录 → 目录内同名文件覆盖，不同名文件保留
-  - 目标存在其他 skill → 保留不变
-  - 同名 skill 出现文件/目录类型冲突 → 替换为源侧类型
-  - 自动过滤系统文件和临时文件
-
 ## 🛠️ 工作流程
 
 ```
@@ -310,14 +288,12 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
 6. 🔄 同步 Claude 配置文件              ← claude.sh
    ├─ settings.json (受管顶层域同步，保留目标非受管配置)
    ├─ CLAUDE.md (强制覆盖)
-   ├─ skills/ (保留目标已有文件，同名 skill 内按文件覆盖)
    └─ .claude.json (确保引导完成)
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
    ├─ config.toml (受管顶层域同步，保留非受管配置)
    ├─ auth.json (目标 auth_mode=chatgpt 时跳过，其余强制覆盖)
-   ├─ AGENTS.md (强制覆盖)
-   └─ skills/ (保留目标已有文件，同名 skill 内按文件覆盖)
+   └─ AGENTS.md (强制覆盖)
    ↓
 8. 📊 统一输出所有同步结果              ← output.sh
    ↓
@@ -342,7 +318,6 @@ target_dirs:
 会按配置类型采用不同策略：
 - **Claude settings.json**：仅同步受管顶层字段，保留目标非受管配置；源中缺失的受管字段会从目标删除
 - **Markdown 文件**：`.claude/CLAUDE.md` 和 `.codex/AGENTS.md` 会强制覆盖
-- **技能目录**：保留目标已有其他 skill，同名 skill 目录内只覆盖同名文件
 - **认证文件**：Codex `auth.json` 在目标已是 ChatGPT 认证（`auth_mode=chatgpt`）时跳过，其余情况强制覆盖
 
 ### Q3: 如果目标路径不存在会怎样？
@@ -373,16 +348,7 @@ target_dirs:
 0 2 * * * /path/to/sync_config.sh >> /var/log/sync_config.log 2>&1
 ```
 
-### Q7: 技能目录会被覆盖吗？
-
-不会整体覆盖。技能目录使用"保留目标已有文件，同名 skill 内按文件覆盖"策略：
-- 源侧存在同名 skill 目录时，只覆盖目录内同名文件
-- 目标侧同名 skill 目录内的其他文件保留不变
-- 目标侧其他 skill 保留不变
-- 自动过滤系统文件和临时文件
-- 用户自定义 skill 只要不与源侧同名，就不会丢失
-
-### Q8: 在 Windows 上如何使用？
+### Q7: 在 Windows 上如何使用？
 
 本工具支持在 Windows 上通过 Git Bash 或 WSL 运行：
 

@@ -73,11 +73,7 @@ print_sync_section() {
         local skip_count=0
         local skip_reason=""
 
-        # 确定显示名称（将 *-skills 统一显示为 skills）
         local display_name="$file"
-        if [[ "$file" =~ -skills$ ]]; then
-            display_name="skills"
-        fi
 
         for result in "${SYNC_RESULTS[@]}"; do
             IFS='|' read -r f_type f_strategy f_target f_status f_detail <<< "$result"
@@ -161,10 +157,10 @@ print_sync_section() {
 # 统一输出所有同步结果
 print_all_sync_results() {
     # Claude 配置同步
-    print_sync_section "Claude" "settings.json" "CLAUDE.md" ".claude.json" "claude-skills"
+    print_sync_section "Claude" "settings.json" "CLAUDE.md" ".claude.json"
 
     # Codex 配置同步
-    print_sync_section "Codex" "auth.json" "config.toml" "AGENTS.md" "codex-skills"
+    print_sync_section "Codex" "auth.json" "config.toml" "AGENTS.md"
 
     echo
 }

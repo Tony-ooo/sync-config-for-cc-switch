@@ -23,12 +23,12 @@ target_dirs:
   #   tool: all
 
   # direct 写法：目标路径本身就是工具配置目录
-  # Codex 会写入 config.toml、auth.json、AGENTS.md、skills/
+  # Codex 会写入 config.toml、auth.json、AGENTS.md
   # - path: $HOME/.openclaw/acpx/codex-home
   #   tool: codex
   #   layout: direct
 
-  # Claude 会写入 settings.json、CLAUDE.md、skills/
+  # Claude 会写入 settings.json、CLAUDE.md
   # .claude.json 会同步到该 direct 目录的上一级目录
   # - path: $HOME/.openclaw/acpx/claude-home
   #   tool: claude
