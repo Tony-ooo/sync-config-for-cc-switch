@@ -15,6 +15,7 @@ CODEX_CONFIG_MANAGED_ROOTS=(
     model_reasoning_summary
     model_context_window
     model_auto_compact_token_limit
+    model_max_output_tokens
     approval_policy
     sandbox_mode
     suppress_unstable_features_warning
