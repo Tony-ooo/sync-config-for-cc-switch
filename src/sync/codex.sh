@@ -601,20 +601,8 @@ sync_codex_auth_json() {
     fi
 }
 
-# 复制 .codex 目录文件: AGENTS.md, auth.json, config.toml
+# 复制 .codex 目录文件: auth.json, config.toml
 copy_codex_files() {
-    # 复制 AGENTS.md（强制覆盖）
-    if [ -f ".codex/AGENTS.md" ]; then
-        for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do
-            copy_and_force_overwrite ".codex/AGENTS.md" "$target/.codex/AGENTS.md" "$target" "AGENTS.md"
-        done
-        for target in "${VALID_CODEX_DIRECT_DIRS[@]}"; do
-            copy_and_force_overwrite ".codex/AGENTS.md" "$target/AGENTS.md" "$target" "AGENTS.md"
-        done
-    else
-        add_sync_result "AGENTS.md" "强制覆盖" "" "error" "未找到源文件"
-    fi
-
     # 复制 auth.json（目标 auth_mode=chatgpt 时跳过，其余强制覆盖）
     if [ -f ".codex/auth.json" ]; then
         for target in "${VALID_CODEX_ROOT_DIRS[@]}"; do

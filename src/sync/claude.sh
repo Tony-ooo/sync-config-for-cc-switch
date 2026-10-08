@@ -100,7 +100,7 @@ sync_claude_settings_json_file() {
     fi
 }
 
-# 复制 .claude 目录文件: settings.json, CLAUDE.md
+# 复制 .claude 目录文件: settings.json
 copy_claude_files() {
     # 同步 settings.json（受管顶层域同步，保留目标非受管配置）
     if [ -f ".claude/settings.json" ]; then
@@ -113,19 +113,6 @@ copy_claude_files() {
     else
         add_sync_result "settings.json" "受管顶层域同步，保留目标非受管配置" "" "error" "未找到源文件"
     fi
-
-    # 复制 CLAUDE.md（强制覆盖）
-    if [ -f ".claude/CLAUDE.md" ]; then
-        for target in "${VALID_CLAUDE_ROOT_DIRS[@]}"; do
-            copy_and_force_overwrite ".claude/CLAUDE.md" "$target/.claude/CLAUDE.md" "$target" "CLAUDE.md"
-        done
-        for target in "${VALID_CLAUDE_DIRECT_DIRS[@]}"; do
-            copy_and_force_overwrite ".claude/CLAUDE.md" "$target/CLAUDE.md" "$target" "CLAUDE.md"
-        done
-    else
-        add_sync_result "CLAUDE.md" "强制覆盖" "" "error" "未找到源文件"
-    fi
-
 }
 
 # 同步目标侧 .claude.json 到"已完成引导"状态

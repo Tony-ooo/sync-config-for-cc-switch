@@ -32,11 +32,10 @@
 | 工具 | 配置文件 | 同步策略 |
 |------|---------|---------|
 | **Claude** | `.claude/settings.json` | 受管顶层域同步，保留目标非受管配置 |
-| **Claude** | `.claude/CLAUDE.md` | 强制覆盖 |
 | **Claude** | `.claude.json` | 确保 `hasCompletedOnboarding=true` |
 | **Codex** | `.codex/config.toml` | 受管顶层域同步，保留目标非受管配置 |
 | **Codex** | `.codex/auth.json` | 目标 `auth_mode=chatgpt` 时跳过，其余强制覆盖 |
-| **Codex** | `.codex/AGENTS.md` | 强制覆盖 |
+
 ## 📦 依赖要求
 
 ### 必需工具
@@ -83,6 +82,10 @@ sync-config-for-cc-switch/
 ```yaml
 # 源配置目录（绝对路径）
 source_dir: /path/to/your/.cc-switch
+
+# 工具总开关（可选，缺省 true），false 时跳过该工具的全部操作
+enable_claude: true
+enable_codex: true
 
 # 目标路径列表
 target_dirs:
@@ -189,6 +192,10 @@ target_dirs:
 # 源配置目录（支持绝对路径、~ 和环境变量）
 source_dir: /home/user/workspace/.cc-switch
 
+# 工具总开关（可选，缺省 true）
+enable_claude: true
+enable_codex: true
+
 # 目标路径列表
 target_dirs:
   - /home/user/workspace/project1
@@ -198,6 +205,44 @@ target_dirs:
 
   # 可以继续添加更多路径
   # - /path/to/another/project
+```
+
+### 工具总开关
+
+`enable_claude` 与 `enable_codex` 是相互独立的总开关，用于整体控制某个工具是否参与本次同步。
+
+| 配置项 | 缺省值 | 说明 |
+|--------|--------|------|
+| `enable_claude` | `true` | `false` 时跳过 Claude 的全部操作 |
+| `enable_codex` | `true` | `false` 时跳过 Codex 的全部操作 |
+
+- 缺省或不配置该项时视为 `true`，保持向后兼容；显式写 `null` 同样视为 `true`
+- 设为 `false` 时该工具**完全不被触碰**：不创建 `.claude/`、`.codex/` 目录，不写入任何配置文件，也不会产生备份文件
+- 被关闭的工具在结果输出中保留分区标题并标注 `(已禁用，跳过)`，便于区分「被开关拦下」与「执行出错」
+- 取值只接受 `true` 或 `false`。写成 `yes`、`1` 等非法值时会报错并以非零状态退出，不会静默跳过
+
+示例——只同步 Codex，完全不动 Claude 相关文件：
+
+```yaml
+source_dir: /path/to/.cc-switch
+enable_claude: false
+enable_codex: true
+
+target_dirs:
+  - /path/to/project1
+```
+
+对应输出：
+
+```
+========== Claude 配置同步 ==========
+(已禁用，跳过)
+
+========== Codex 配置同步 ==========
+→ auth.json (目标 auth_mode=chatgpt 时跳过，其余强制覆盖)
+  ✓ 目标路径1
+→ config.toml (受管顶层域同步，保留目标非受管配置)
+  ✓ 目标路径1
 ```
 
 ## 💡 使用方法
@@ -287,13 +332,11 @@ export SYNC_CONFIG_FILE=/path/to/config.yml
    ↓
 6. 🔄 同步 Claude 配置文件              ← claude.sh
    ├─ settings.json (受管顶层域同步，保留目标非受管配置)
-   ├─ CLAUDE.md (强制覆盖)
    └─ .claude.json (确保引导完成)
    ↓
 7. 🔄 同步 Codex 配置文件               ← codex.sh
    ├─ config.toml (受管顶层域同步，保留非受管配置)
-   ├─ auth.json (目标 auth_mode=chatgpt 时跳过，其余强制覆盖)
-   └─ AGENTS.md (强制覆盖)
+   └─ auth.json (目标 auth_mode=chatgpt 时跳过，其余强制覆盖)
    ↓
 8. 📊 统一输出所有同步结果              ← output.sh
    ↓
@@ -317,7 +360,6 @@ target_dirs:
 
 会按配置类型采用不同策略：
 - **Claude settings.json**：仅同步受管顶层字段，保留目标非受管配置；源中缺失的受管字段会从目标删除
-- **Markdown 文件**：`.claude/CLAUDE.md` 和 `.codex/AGENTS.md` 会强制覆盖
 - **认证文件**：Codex `auth.json` 在目标已是 ChatGPT 认证（`auth_mode=chatgpt`）时跳过，其余情况强制覆盖
 
 ### Q3: 如果目标路径不存在会怎样？

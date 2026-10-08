@@ -2,7 +2,7 @@
 
 # ==================== 路径验证与过滤模块 ====================
 # 职责: 路径验证与过滤
-# 导出变量: VALID_TARGET_DIRS, VALID_CLAUDE_ROOT_DIRS, VALID_CLAUDE_DIRECT_DIRS, VALID_CODEX_ROOT_DIRS, VALID_CODEX_DIRECT_DIRS
+# 导出变量: VALID_CLAUDE_ROOT_DIRS, VALID_CLAUDE_DIRECT_DIRS, VALID_CODEX_ROOT_DIRS, VALID_CODEX_DIRECT_DIRS
 # 依赖: output.sh (TARGET_PATH_INDICES)
 
 append_target_index() {
@@ -45,7 +45,6 @@ is_supported_target_tool() {
 # 路径验证函数:检查路径存在性和可写性
 filter_valid_paths() {
     echo "正在检查目标路径..."
-    VALID_TARGET_DIRS=()
     VALID_CLAUDE_ROOT_DIRS=()
     VALID_CLAUDE_DIRECT_DIRS=()
     VALID_CODEX_ROOT_DIRS=()
@@ -99,8 +98,6 @@ filter_valid_paths() {
         fi
 
         if [ "$layout" = "root" ]; then
-            VALID_TARGET_DIRS+=("$dir")
-
             if [ "$tool" = "all" ] || [ "$tool" = "claude" ]; then
                 VALID_CLAUDE_ROOT_DIRS+=("$dir")
             fi

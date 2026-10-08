@@ -4,6 +4,11 @@
 # 源配置目录（支持绝对路径、~ 和环境变量）
 source_dir: /home/dev/workspace/Project/sync-config-for-cc-switch/.cc-switch
 
+# 工具总开关（可选，缺省 true）
+# 设为 false 时跳过该工具的全部操作：不创建目录、不写入任何文件、不备份
+enable_claude: true
+enable_codex: true
+
 # 目标路径列表
 # 支持多种路径格式，工具会自动处理路径转换和验证
 target_dirs:
@@ -23,12 +28,12 @@ target_dirs:
   #   tool: all
 
   # direct 写法：目标路径本身就是工具配置目录
-  # Codex 会写入 config.toml、auth.json、AGENTS.md
+  # Codex 会写入 config.toml、auth.json
   # - path: $HOME/.openclaw/acpx/codex-home
   #   tool: codex
   #   layout: direct
 
-  # Claude 会写入 settings.json、CLAUDE.md
+  # Claude 会写入 settings.json
   # .claude.json 会同步到该 direct 目录的上一级目录
   # - path: $HOME/.openclaw/acpx/claude-home
   #   tool: claude

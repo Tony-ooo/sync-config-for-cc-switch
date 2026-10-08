@@ -52,14 +52,16 @@ main() {
     # 2. 准备必要目录
     prepare_directories
 
-    # 3. 同步 Claude 配置
-    if [ -d ".claude" ]; then
-        copy_claude_files
+    # 3. 同步 Claude 配置（受 enable_claude 总开关控制）
+    if [ "$ENABLE_CLAUDE" = "true" ]; then
+        if [ -d ".claude" ]; then
+            copy_claude_files
+        fi
+        copy_claude_json
     fi
-    copy_claude_json
 
-    # 4. 同步 Codex 配置
-    if [ -d ".codex" ]; then
+    # 4. 同步 Codex 配置（受 enable_codex 总开关控制）
+    if [ "$ENABLE_CODEX" = "true" ] && [ -d ".codex" ]; then
         copy_codex_files
     fi
 
@@ -86,8 +88,8 @@ load_modules
 check_and_install_yq
 check_and_install_jq
 
-# 5. 加载配置文件
-CONFIG_PATH=$(locate_config_file)
+# 5. 加载配置文件（locate_config_file 以命令替换调用，需在此终止脚本）
+CONFIG_PATH=$(locate_config_file) || exit 1
 parse_config_file "$CONFIG_PATH"
 
 # 6. 验证源目录

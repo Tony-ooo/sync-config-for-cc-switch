@@ -2,10 +2,12 @@
 
 # ==================== 配置文件定位与解析模块 ====================
 # 职责: 配置文件定位与解析
-# 导出变量: CONFIG_PATH, SOURCE_DIR, TARGET_DIRS, TARGET_LAYOUTS, TARGET_TOOLS
+# 导出变量: CONFIG_PATH, SOURCE_DIR, TARGET_DIRS, TARGET_LAYOUTS, TARGET_TOOLS, ENABLE_CLAUDE, ENABLE_CODEX
 # 依赖: yq
 
 # 配置文件定位函数
+# 注意: 本函数由调用方以 $(...) 方式调用，函数内的 exit 只能终止子 shell，
+#       因此失败时使用 return 1，由调用方负责退出。
 locate_config_file() {
     local config_candidates=(
         "$SCRIPT_DIR/sync_config.yml"     # 优先：脚本同目录
@@ -20,7 +22,7 @@ locate_config_file() {
             return 0
         else
             echo "错误: 指定的配置文件不存在或无读取权限: $CONFIG_FILE" >&2
-            exit 1
+            return 1
         fi
     fi
 
@@ -43,7 +45,35 @@ locate_config_file() {
     echo "错误: 未找到配置文件，已查找位置:" >&2
     printf "  - %s\n" "${config_candidates[@]}" >&2
     echo "请创建配置文件或使用 -c 参数指定" >&2
-    exit 1
+    return 1
+}
+
+# 解析工具总开关（顶层键，缺省 true）
+# 参数:
+#   $1 = yq_config_file (已转换为 Windows 路径的配置文件)
+#   $2 = key (开关键名，如 "enable_claude")
+# 返回: true / false（配置值非法时报错退出）
+parse_tool_switch() {
+    local yq_config_file="$1"
+    local key="$2"
+    local raw_value
+
+    raw_value=$(yq eval ".${key}" "$yq_config_file" 2>/dev/null)
+
+    # 未配置或显式 null 时视为启用（不能用 // 运算符，yq 会把 false 也当作空值）
+    if [ -z "$raw_value" ] || [ "$raw_value" = "null" ]; then
+        raw_value="true"
+    fi
+
+    case "$raw_value" in
+        true|false)
+            echo "$raw_value"
+            ;;
+        *)
+            echo "错误: 配置项 ${key} 必须为 true 或 false，实际为: ${raw_value}" >&2
+            return 1
+            ;;
+    esac
 }
 
 # 配置文件解析函数
@@ -54,6 +84,8 @@ parse_config_file() {
     TARGET_DIRS=()
     TARGET_LAYOUTS=()
     TARGET_TOOLS=()
+    ENABLE_CLAUDE="true"
+    ENABLE_CODEX="true"
 
     # 转换路径为 Windows 格式（如果在 Git Bash/MINGW 环境）
     local yq_config_file="$config_file"
@@ -84,6 +116,10 @@ parse_config_file() {
 
     # 转换 WSL 路径（如果适用）
     SOURCE_DIR=$(convert_wsl_path_for_bash "$SOURCE_DIR")
+
+    # 解析工具总开关（调用方负责终止，函数内的 return 无法直接退出主脚本）
+    ENABLE_CLAUDE=$(parse_tool_switch "$yq_config_file" "enable_claude") || exit 1
+    ENABLE_CODEX=$(parse_tool_switch "$yq_config_file" "enable_codex") || exit 1
 
     # 解析 target_dirs 数组
     local target_count=$(yq eval '.target_dirs | length' "$yq_config_file" 2>/dev/null)

@@ -63,39 +63,6 @@ convert_wsl_path_for_bash() {
     fi
 }
 
-# 强制覆盖目标文件
-# 参数:
-#   $1 = source_file (源文件路径)
-#   $2 = target_file (目标文件路径)
-#   $3 = target_root (目标根路径，用于结果记录)
-#   $4 = file_type (文件类型，如 "auth.json")
-copy_and_force_overwrite() {
-    local source_file="$1"
-    local target_file="$2"
-    local target_root="$3"
-    local file_type="$4"
-    local strategy="强制覆盖"
-
-    if [ -z "$source_file" ] || [ -z "$target_file" ]; then
-        return 0
-    fi
-
-    if [ ! -f "$source_file" ]; then
-        return 0
-    fi
-
-    if [ -d "$target_file" ]; then
-        add_sync_result "$file_type" "$strategy" "$target_root" "warning" "目标是目录"
-        return 0
-    fi
-
-    if cp -f "$source_file" "$target_file"; then
-        add_sync_result "$file_type" "$strategy" "$target_root" "success"
-    else
-        add_sync_result "$file_type" "$strategy" "$target_root" "warning" "无法写入"
-    fi
-}
-
 ensure_sync_dir() {
     local dir_path="$1"
     local current_dir
@@ -142,24 +109,6 @@ safe_backup() {
 
     if cp -f "$file_path" "$backup_file" 2>/dev/null; then
         echo "$backup_file"
-        return 0
-    else
-        return 1
-    fi
-}
-
-# 验证 JSON 格式
-# 参数: $1 = file_path (文件路径)
-# 返回: 0 (合法) 或 1 (非法)
-is_valid_json() {
-    local file_path="$1"
-
-    if [ ! -f "$file_path" ]; then
-        return 1
-    fi
-
-    local jq_path=$(convert_path_for_windows "$file_path")
-    if jq empty "$jq_path" 2>/dev/null; then
         return 0
     else
         return 1

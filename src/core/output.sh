@@ -57,7 +57,7 @@ add_sync_result() {
 # 输出某个配置类型的同步结果
 # 参数:
 #   $1 = 配置类型 (如 "Claude")
-#   $@ = 文件列表 (如 "settings.json" "CLAUDE.md" ".claude.json")
+#   $@ = 文件列表 (如 "settings.json" ".claude.json")
 print_sync_section() {
     local section_name="$1"
     shift
@@ -154,13 +154,31 @@ print_sync_section() {
     echo
 }
 
+# 输出被总开关禁用的配置分区
+# 参数: $1 = 配置类型 (如 "Claude")
+print_disabled_section() {
+    local section_name="$1"
+
+    echo "========== ${section_name} 配置同步 =========="
+    echo "(已禁用，跳过)"
+    echo
+}
+
 # 统一输出所有同步结果
 print_all_sync_results() {
     # Claude 配置同步
-    print_sync_section "Claude" "settings.json" "CLAUDE.md" ".claude.json"
+    if [ "$ENABLE_CLAUDE" = "true" ]; then
+        print_sync_section "Claude" "settings.json" ".claude.json"
+    else
+        print_disabled_section "Claude"
+    fi
 
     # Codex 配置同步
-    print_sync_section "Codex" "auth.json" "config.toml" "AGENTS.md"
+    if [ "$ENABLE_CODEX" = "true" ]; then
+        print_sync_section "Codex" "auth.json" "config.toml"
+    else
+        print_disabled_section "Codex"
+    fi
 
     echo
 }

@@ -2,7 +2,7 @@
 
 # ==================== 目录准备模块 ====================
 # 职责: 目录准备
-# 依赖: VALID_CLAUDE_ROOT_DIRS, VALID_CLAUDE_DIRECT_DIRS, VALID_CODEX_ROOT_DIRS, VALID_CODEX_DIRECT_DIRS
+# 依赖: ENABLE_CLAUDE, ENABLE_CODEX, VALID_CLAUDE_ROOT_DIRS, VALID_CLAUDE_DIRECT_DIRS, VALID_CODEX_ROOT_DIRS, VALID_CODEX_DIRECT_DIRS
 
 # 目录准备函数:创建必要的 .claude/.codex 子目录
 prepare_directories() {
@@ -10,10 +10,10 @@ prepare_directories() {
     local source_has_claude=0
     local source_has_codex=0
 
-    if [ -d ".claude" ]; then
+    if [ "$ENABLE_CLAUDE" = "true" ] && [ -d ".claude" ]; then
         source_has_claude=1
     fi
-    if [ -d ".codex" ]; then
+    if [ "$ENABLE_CODEX" = "true" ] && [ -d ".codex" ]; then
         source_has_codex=1
     fi
 
